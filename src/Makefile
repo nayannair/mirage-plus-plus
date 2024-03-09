@@ -9,7 +9,7 @@ PFLAGS    := -pg
 
 
 all:  folders traces
-	${CC} ${CFLAGS} dram.c  mgries.c cra_ctr.c ctrcache.c scoreboard.c mcore.c os.c  mcache.c sim.c memsys.c  hash_lib.c malloc_lib.c hydra.c -o ${SIM}
+	${CC} ${CFLAGS} dram.c  mgries.c cra_ctr.c ctrcache.c scoreboard.c mcore.c os.c  mcache.c sim.c memsys.c  hash_lib.c malloc_lib.c hydra.c mirage.c prince.c -o ${SIM}
 
 folders: 
 	mkdir -p ../RESULTS

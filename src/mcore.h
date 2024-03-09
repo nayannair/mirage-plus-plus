@@ -6,6 +6,7 @@
 #include "os.h"
 #include "mcache.h"
 #include <zlib.h>
+#include "mirage.h"
 
 
 typedef struct MCore MCore;
@@ -20,7 +21,8 @@ struct MCore {
     uns   tid;
 
     MemSys *memsys;
-    MCache *l3cache;
+    mirageCache *l3cache;
+    MCache *l3cache_m;
     OS  *os;
   
     char  addr_trace_fname[1024];
@@ -58,6 +60,7 @@ struct MCore {
 //////////////////////////////////////////////////////////////////////////////
 
 MCore *mcore_new(MemSys *memsys, OS *os, MCache *l3cache, char *addr_trace_fname, uns tid);
+MCore *mcore_new_m(MemSys *memsys, OS *os, mirageCache *l3cache, char *addr_trace_fname, uns tid);
 void   mcore_cycle(MCore *core);
 void   mcore_print_stats(MCore *c);
 void   mcore_read_trace(MCore *c);

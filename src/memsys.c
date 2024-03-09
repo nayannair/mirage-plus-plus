@@ -52,7 +52,7 @@ MemSys *memsys_new(uns num_threads, uns64 rh_threshold){
     /* m->cra_t = cra_ctr_new(...);    */
     
     //GCT Table for Hydra
-    int threshold = rh_threshold/2;
+    /*int threshold = rh_threshold/2;
     int num_ctrs = ((MEM_SIZE_MB*1024*1024)/MEM_PAGESIZE)/128; //128 rows in one group
     m->gct_ctr_t = (GCT_ctr*) calloc (1, sizeof (GCT_ctr));
     m->gct_ctr_t = gct_ctr_new(num_ctrs,threshold);
@@ -67,6 +67,8 @@ MemSys *memsys_new(uns num_threads, uns64 rh_threshold){
     uns assocs = 16;
     m->rcc_cache_t = (rcc_cache*) calloc (1, sizeof (rcc_cache));
     m->rcc_cache_t = rcc_cache_new(num_sets,assocs);
+    */
+    
 
     return m;
 }
@@ -95,13 +97,14 @@ uns64 memsys_access(MemSys *m, Addr lineaddr,  uns tid, uns64 in_cycle){
   //}
   /*******Edit ***********/
 
-
+  /*
   Addr rowAddr = lineaddr >> 7;
   //Access GCT
   if(m->dram_acc_info.isACT && gct_ctr_access(m->gct_ctr_t,m->rct_ctr_t,m->rcc_cache_t,m->mainmem,rowAddr,in_cycle))
   {
       memsys_rh_mitigate(m,rowAddr,in_cycle);
   }
+  */
 
   // stat collection happens below this line
   m->s_totaccess++;

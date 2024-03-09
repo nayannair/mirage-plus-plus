@@ -23,7 +23,8 @@ MCore *mcore_new(MemSys *memsys, OS *os, MCache *l3cache, char *addr_trace_fname
   c->tid    = tid;
   c->memsys  = memsys;
   c->os      = os;
-  c->l3cache = l3cache;
+  c->l3cache_m = l3cache;
+
 
   strcpy(c->addr_trace_fname, addr_trace_fname);
   mcore_init_trace(c);
@@ -32,6 +33,21 @@ MCore *mcore_new(MemSys *memsys, OS *os, MCache *l3cache, char *addr_trace_fname
   return c;
 }
 
+MCore *mcore_new_m(MemSys *memsys, OS *os, mirageCache *l3cache, char *addr_trace_fname, uns tid)
+{
+  MCore *c = (MCore *) calloc (1, sizeof (MCore));
+  c->tid    = tid;
+  c->memsys  = memsys;
+  c->os      = os;
+  c->l3cache = l3cache;
+
+
+  strcpy(c->addr_trace_fname, addr_trace_fname);
+  mcore_init_trace(c);
+  mcore_read_trace(c);
+
+  return c;
+}
 
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
@@ -82,17 +98,21 @@ void mcore_cycle (MCore *c)
       
       uns64 delay=0;
       
-      
       c->access_count++;
-      l3outcome = mcache_access(c->l3cache, orig_lineaddr);
+      l3outcome = mirageCache_access(c->l3cache, orig_lineaddr);
+      //printf("After access\n");
+
       delay+=L3_LATENCY; // incurred on both hit and miss
 
-      if( (L3_PERFECT==FALSE) && (l3outcome==MISS)){
-	uns64 memsysdelay;
-	memsysdelay = memsys_access(c->memsys, orig_lineaddr, c->tid, c->cycle+delay);
-	delay+=memsysdelay;
-	mcache_install(c->l3cache,orig_lineaddr); 
-	c->miss_count++;
+      if( (L3_PERFECT==FALSE) && (l3outcome==MISS))
+      {
+        uns64 memsysdelay;
+        memsysdelay = memsys_access(c->memsys, orig_lineaddr, c->tid, c->cycle+delay);
+        delay+=memsysdelay;
+        
+        mirageCache_install(c->l3cache,orig_lineaddr); 
+        //printf("After install\n");
+        c->miss_count++;
       }
       
       c->delay_count +=  delay;

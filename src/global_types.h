@@ -18,7 +18,10 @@
 #define SAT_INC(x,max)   (x<max)? x+1:x
 #define SAT_DEC(x)       (x>0)? x-1:0
 
-
+#define EXTRA_WAYS 0.75
+#define NUM_SETS 16384
+#define NUM_ASSOCS 8
+#define NUM_SKEW 2
 /* Renames -- Try to use these rather than built-in C types for portability */
 
 
