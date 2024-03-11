@@ -58,9 +58,11 @@ typedef struct mirageCache{
   tagStore* TagStore;
   dataStore* DataStore;
 
-  //uns64 s_count; // number of accesses
-  //uns64 s_miss; // number of misses
-  //uns64 s_evict; // number of evictions
+  uns64 s_count; // number of accesses
+  uns64 s_miss; // number of misses
+  uns64 s_hits; // number of hits
+  uns64 s_evict; // number of evictions from data store
+  uns64 s_installs; // number of installs
 
 } mirageCache;
 
@@ -77,6 +79,9 @@ void mirageCache_install (mirageCache *c, Addr addr);
 uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE);
 //Global eviction
 uns mirageGLE(mirageCache *c);
+
+void mirage_print_stats(mirageCache *c, char *header);
+
 
 
 

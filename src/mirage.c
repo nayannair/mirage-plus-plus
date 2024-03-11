@@ -1,8 +1,7 @@
 #include "mirage.h"
 #include "prince.h"
 //TODO
-// implement hash functions -- PRINCE64
-// define SKEW_SIZE and SET_SIZE globally
+// implement write/read functionality and dirty writebacks
 
 #define SKEW_SIZE 16384*14
 #define SET_SIZE 14
@@ -27,6 +26,12 @@ mirageCache *mirageCache_new(uns sets, uns assocs, uns skews )
     c->DataStore->entries = (dataEntry*) calloc(num_entries_data,sizeof(dataEntry));    // sum*assocs = lines
     c->DataStore->num_lines = skews*sets*assocs;
 
+    c->s_count = 0; // number of accesses
+    c->s_miss  = 0; // number of misses
+    c->s_hits  = 0; // number of hits
+    c->s_evict = 0; // number of evictions from data store
+    c->s_installs = 0; 
+
     
     for(int i =0; i<num_entries_data; i++)
     {
@@ -48,6 +53,7 @@ mirageCache *mirageCache_new(uns sets, uns assocs, uns skews )
 // Addr is line addr = addr / CACHE_LINESIZE
 Flag mirageCache_access (mirageCache *c, Addr addr)
 {
+    c->s_count++;
     // Access skews in parallel
     for(int i =0 ; i<c->TagStore->skews; i++)
     {
@@ -55,7 +61,7 @@ Flag mirageCache_access (mirageCache *c, Addr addr)
         Addr skew_set_index = mirage_hash(i,addr);
         Addr incoming_tag = addr; //Full 40-bit tag
 
-        //printf("checking entry number: %lu\n",i*SKEW_SIZE+skew_set_index*SET_SIZE);
+        //printf("checking entry: SKEW %lu, SET Index: %lu\n",i,skew_set_index);
         
 
         for(int j =0; j< c->TagStore->total_assocs_per_skew; j++)
@@ -63,17 +69,22 @@ Flag mirageCache_access (mirageCache *c, Addr addr)
             if(c->TagStore->entries[i*SKEW_SIZE+skew_set_index*SET_SIZE+j].valid && incoming_tag == c->TagStore->entries[i*SKEW_SIZE+skew_set_index*SET_SIZE+j].full_tag)
             {
                 //Line Found in Tag Store
-                return TRUE;
+                //printf("Line Found in Cache at entry! at SKEW: %lu, SET: %lu, Way: %lu\n",i,skew_set_index,j);
+                c->s_hits++;
+                return HIT;
             }
         }
         
     }
-    return FALSE;
+    //printf("Line is a miss in LLC!\n");
+    c->s_miss++;
+    return MISS;
 }
 
 // Cache Install
 void mirageCache_install (mirageCache *c, Addr addr)
 {
+    c->s_installs++;
     Flag tagSAE;
     //Index and install using power of 2 choices and perform global eviction
     uns skew_select = skewSelect(c,addr, &tagSAE);
@@ -98,34 +109,26 @@ void mirageCache_install (mirageCache *c, Addr addr)
     }
     //Only proceeds beyond this point if there are invalid tags present
     
-    
     Addr skew_set_index = mirage_hash(skew_select, addr);
 
-    uns evicted_line_index; 
+    uint64_t evicted_line_index; 
 
-    //If data store full -- perform global eviction
-    if(c->DataStore->isFull)
+    Flag isFull = TRUE;
+    //Find unused data store entry
+    for(uint64_t i =0; i < c->DataStore->num_lines ; i++)
+    {
+        if(c->DataStore->entries[i].rPtr == NULL)
+        {
+            //printf("Found invalid data entry!\n");
+            evicted_line_index = i;
+            isFull = FALSE;
+            break;
+        }
+    }
+
+    if(isFull)
     {
         evicted_line_index = mirageGLE(c);
-    }
-    else
-    {
-        //Find unused data store entry
-        for(int i =0; i < c->DataStore->num_lines ; i++)
-        {
-            if(c->DataStore->entries[i].rPtr == NULL)
-            {
-                evicted_line_index = i;
-                break;
-            }
-        }
-
-        //Check if data store is full
-        if(evicted_line_index == c->DataStore->num_lines-1)
-        {
-            c->DataStore->isFull = TRUE;
-        }
-
     }
 
     //Install Line
@@ -133,19 +136,25 @@ void mirageCache_install (mirageCache *c, Addr addr)
     //Tag Store
     for (int i =0 ; i < c->TagStore->total_assocs_per_skew ; i++)
     {
-        if(!c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE].valid)
+        if(!c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i].valid)
         {
-            c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE].fPtr = &(c->DataStore->entries[evicted_line_index]);
-            c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE].valid = TRUE;
-            c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE].full_tag = addr;
-            tagPtr = &(c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE]);
+            //printf("installing in Tag Store: %lu\n",skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i);
+
+            c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i].fPtr = &(c->DataStore->entries[evicted_line_index]);
+            c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i].valid = TRUE;
+            c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i].full_tag = addr;
+            tagPtr = &(c->TagStore->entries[skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i]);
             break;
         }
     }
     //Data Store
+    if(tagPtr)
     {
+        //printf("installing in Data Store: %lu\n",evicted_line_index);
+
         c->DataStore->entries[evicted_line_index].Data = 0; //Shouldn't matter
         c->DataStore->entries[evicted_line_index].rPtr = tagPtr;
+        return;
     }
 }
 
@@ -153,6 +162,7 @@ void mirageCache_install (mirageCache *c, Addr addr)
 //Global Eviction from Data Store
 uns mirageGLE(mirageCache *c)
 {
+    //printf("Random Global Eviction\n");
     srand( time(NULL) );
     //Choose a line from data store randomly for eviction
     uns line_to_evict = rand() % (c->DataStore->num_lines);
@@ -229,14 +239,17 @@ Addr mirage_hash(uns skew, Addr addr)
     //PRINCE Cipher with skew number as the seed
     Addr hashed_addr = calcPRINCE64(addr,skew) % NUM_SETS;
     return hashed_addr;
-    /*
-    switch(skew)
-    {
-        case 0: return addr; 
-                break;
-        case 1: return addr;
-                break;
-        default: return addr;
-    }
-    */
+    
+}
+
+// Print Stats
+void mirage_print_stats(mirageCache *c, char *header)
+{
+  printf("\n%s_ACCESS       \t : %llu",  header,  c->s_count);
+  printf("\n%s_MISS         \t : %llu",  header,  c->s_miss);
+  printf("\n%s_HITS         \t : %llu",  header,  c->s_hits);
+  printf("\n%s_INSTALLS     \t : %llu",  header,  c->s_installs);
+  printf("\n%s_EVICTS       \t : %llu",  header,  c->s_evict);
+
+  printf("\n");
 }

@@ -99,6 +99,7 @@ void mcore_cycle (MCore *c)
       uns64 delay=0;
       
       c->access_count++;
+      //printf("Line Addr : %lu\n", orig_lineaddr);
       l3outcome = mirageCache_access(c->l3cache, orig_lineaddr);
       //printf("After access\n");
 
