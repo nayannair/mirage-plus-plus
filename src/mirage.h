@@ -1,14 +1,18 @@
 #ifndef MIRAGE_H
 #define MIRAGE_H
 
+#include "mtrand.h"
 #include "global_types.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
+#include "externs.h"
 
 //#define SKEW_SIZE total_assocs_per_skew*sets
 //#define SET_SIZE total_assocs_per_skew
+
+
 
 typedef struct dataEntry;
 
@@ -59,6 +63,12 @@ typedef struct mirageCache{
   tagStore* TagStore;
   dataStore* DataStore;
 
+  //Hash table for PRINCE cipher for all lineaddr in mem
+  Addr* princeHashTable0;
+  Addr* princeHashTable1;
+
+  Addr skew_set_index_arr[NUM_SKEW];
+
   uns64 s_count; // number of accesses
   uns64 s_miss; // number of misses
   uns64 s_hits; // number of hits
@@ -71,20 +81,25 @@ typedef struct mirageCache{
   uns64 m_miss[NUM_SKEW][NUM_SETS];
   uns64 m_access[NUM_SKEW][NUM_SETS];
   uns64 m_gle;
+  uns64 m_sae;
+
+  //seed for hash function per skew
+  uns64 seed[NUM_SKEW];
+
 
 } mirageCache;
 
 
 // Create new Mirage LLC
-mirageCache *mirageCache_new(uns sets, uns base_assocs, uns skews );
+mirageCache *mirage_new(uns sets, uns base_assocs, uns skews );
 // Access Mirage LLC
-Flag mirageCache_access (mirageCache *c, Addr addr);
+Flag mirage_access (mirageCache *c, Addr addr);
 // Hash function 
 Addr mirage_hash(uns skew, Addr addr);
 // Cache install
-void mirageCache_install (mirageCache *c, Addr addr);
+void mirage_install (mirageCache *c, Addr addr);
 // Select skew 
-uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE, Addr* skew_set_index);
+uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE);
 //Global eviction
 uns mirageGLE(mirageCache *c);
 

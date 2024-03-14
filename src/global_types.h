@@ -18,10 +18,11 @@
 #define SAT_INC(x,max)   (x<max)? x+1:x
 #define SAT_DEC(x)       (x>0)? x-1:0
 
-#define EXTRA_WAYS 0.75
+#define EXTRA_WAYS 6
 #define NUM_SETS 16384
 #define NUM_ASSOCS 8
 #define NUM_SKEW 2
+#define NUM_LINES_IN_MEM MEM_SIZE_MB*1024*1024/LINESIZE
 /* Renames -- Try to use these rather than built-in C types for portability */
 
 

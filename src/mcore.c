@@ -100,7 +100,7 @@ void mcore_cycle (MCore *c)
       
       c->access_count++;
       //printf("Line Addr : %lu\n", orig_lineaddr);
-      l3outcome = mirageCache_access(c->l3cache, orig_lineaddr);
+      l3outcome = mirage_access(c->l3cache, orig_lineaddr);
       //printf("After access\n");
 
       delay+=L3_LATENCY; // incurred on both hit and miss
@@ -111,7 +111,7 @@ void mcore_cycle (MCore *c)
         memsysdelay = memsys_access(c->memsys, orig_lineaddr, c->tid, c->cycle+delay);
         delay+=memsysdelay;
         
-        mirageCache_install(c->l3cache,orig_lineaddr); 
+        mirage_install(c->l3cache,orig_lineaddr); 
         //printf("After install\n");
         c->miss_count++;
       }
