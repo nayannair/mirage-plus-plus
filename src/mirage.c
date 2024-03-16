@@ -4,8 +4,7 @@
 // Power of 2 choices --> random skew selection only works for 2 skews. Generalize for > 2
 // implement write/read functionality and dirty writebacks
 
-#define SKEW_SIZE 16384*14
-#define SET_SIZE 14
+
 
 MTRand *mtrand=new MTRand(42);
 
@@ -47,8 +46,9 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     {
         c->skew_set_index_arr[i] = -1;
         //Initialize seed
-        c->seed[i] = rand();
-        
+        //c->seed[i] = rand();
+        c->seed[i] = 42;
+
         for(int j=0; j < NUM_SETS; j++)
         {
             c->m_installs[i][j] = 0;
@@ -108,6 +108,7 @@ Flag mirage_access (mirageCache *c, Addr addr)
 
         Addr incoming_tag = addr; //Full 40-bit tag
 
+        //printf("Addr: %lu\n",addr);
         //printf("checking entry: SKEW %lu, SET Index: %lu\n",i,c->skew_set_index_arr[i]);
         c->m_access[i][c->skew_set_index_arr[i]]++;
 
@@ -158,6 +159,7 @@ void mirage_install (mirageCache *c, Addr addr)
         c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].full_tag = addr;
         c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty = FALSE; 
         c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].valid = TRUE;
+        //printf()
         //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].fPtr->Data = 0;   //Use incoming data if needed
         return;
     }
@@ -196,6 +198,10 @@ void mirage_install (mirageCache *c, Addr addr)
             c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i].valid = TRUE;
             c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i].full_tag = addr;
             tagPtr = &(c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i]);
+            if(c->skew_set_index_arr[skew_select] == 0)
+            {
+                printf("Set %lu -> Way %d --> Valid %d\n",c->skew_set_index_arr[skew_select],i,c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i].valid);
+            }
             c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
             //printf("Skew %lu, set %lu has %lu installs\n",skew_select,skew_set_index,c->s_distribution[skew_select][skew_set_index]);
             break;
@@ -277,7 +283,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
             }
         }
 
-        if(invalid_tags > max_invalid_tags)
+        /*if(invalid_tags > max_invalid_tags)
         {
             max_invalid_tags = invalid_tags;
             skew_select = i;
@@ -288,7 +294,9 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         {
             //skew_select = rand() % 2;
             skew_select = mtrand->randInt(1) % 2;
-        }
+        }*/
+
+        max_invalid_tags = invalid_tags;
     }
     
     //assert (max_invalid_tags != 0);
@@ -299,9 +307,9 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         *tagSAE = TRUE;
         c->m_sae++;
         //Select skew on random
-        uns skew_rand = rand() % c->TagStore->skews;
+        //uns skew_rand = rand() % c->TagStore->skews;
         //*skew_set_index = c->skew_set_index_arr[skew_rand];
-        return ( skew_rand );
+        return ( 0 );
     }
     else
     {
@@ -309,7 +317,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
     }
 
     //*skew_set_index = c->skew_set_index_arr[skew_select];
-    return skew_select;
+    return 0;
 }
 
 // Return hashed addr
@@ -329,7 +337,7 @@ void mirage_print_stats(mirageCache *c, char *header)
   printf("\n%s_MISS         \t : %llu",  header,  c->s_miss);
   printf("\n%s_HITS         \t : %llu",  header,  c->s_hits);
   printf("\n%s_INSTALLS     \t : %llu",  header,  c->s_installs);
-  printf("\n%s_EVICTS       \t : %llu",  header,  c->s_evict);
+  printf("\n%s_EVICTS       \t : %llu",  header,  c->m_gle);
   printf("\n%s_SAE_EVICTS   \t : %llu",  header,  c->m_sae);
 
   printf("\n---------------------SKEW-SET-DISTRIBUTION----------------------\n");
