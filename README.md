@@ -67,5 +67,7 @@ A fast DRAM simulator for evaluating Rowhammer defenses.
 - **Get Statistics**: To get statistics, you can check the output of the simulator. For the bwaves_06 run  above, you can see `../RESULTS/BASELINE.4C.8MB/bwaves_06.res` for statistics like `SYS_CYCLES : 2155238427`. 
   - To report a statistic (SYS_CYCLES) for all benchmarks and several results folders, use `cd ../scripts;  perl getdata.pl -w lab1 -amean -s SYS_CYCLES  -d ../RESULTS/BASELINE.4C.8MB <ANOTHER RESULTS FOLDER>`. 
   - `getdata.pl` has several other useful flags including `-gmean` for geometric mean, `-n` for normalizing results of one folder with another, `-mstat` to multiply all stats with a constant value and more.
-  
+
+## Pinned Repository
+https://github.com/nayannair/mirage-plus-plus
 
