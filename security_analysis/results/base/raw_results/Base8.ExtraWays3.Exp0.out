@@ -2,34 +2,58 @@ Cache Configuration: 16 MB, 2 skews, 16 ways (8 ways/skew)
 AVG-BALLS-PER-BUCKET:8, BUCKET-SPILL-THRESHOLD:11 
 Simulation Parameters - BALL_THROWS:10000000000, SEED:0
 
+
+*** Sanity Passed *****
+
+*** Sanity Passed *****
 Starting --  (Dot printed every 100M Ball throws) 
-.......... 1Bn
-.......... 2Bn
-.......... 3Bn
-.......... 4Bn
-.......... 5Bn
-.......... 6Bn
-.......... 7Bn
-.......... 8Bn
-.......... 9Bn
-.......... 10Bn
+..........
+*** Sanity Passed *****
+ 1Bn
+..........
+*** Sanity Passed *****
+ 2Bn
+..........
+*** Sanity Passed *****
+ 3Bn
+..........
+*** Sanity Passed *****
+ 4Bn
+..........
+*** Sanity Passed *****
+ 5Bn
+..........
+*** Sanity Passed *****
+ 6Bn
+..........
+*** Sanity Passed *****
+ 7Bn
+..........
+*** Sanity Passed *****
+ 8Bn
+..........
+*** Sanity Passed *****
+ 9Bn
+..........
+*** Sanity Passed *****
+ 10Bn
 
 
 Bucket-Occupancy Snapshot at End of Experiment
 
 Occupancy: 		 Count
 Bucket[ 0 Fill]: 	 0 	 (0.00)
-Bucket[ 1 Fill]: 	 2 	 (0.01)
-Bucket[ 2 Fill]: 	 14 	 (0.04)
-Bucket[ 3 Fill]: 	 91 	 (0.28)
-Bucket[ 4 Fill]: 	 346 	 (1.06)
-Bucket[ 5 Fill]: 	 1115 	 (3.40)
-Bucket[ 6 Fill]: 	 2859 	 (8.72)
-Bucket[ 7 Fill]: 	 6130 	 (18.71)
-Bucket[ 8 Fill]: 	 9381 	 (28.63)
-Bucket[ 9 Fill]: 	 8875 	 (27.08)
-Bucket[10 Fill]: 	 3610 	 (11.02)
-Bucket[11 Fill]: 	 345 	 (1.05)
+Bucket[ 1 Fill]: 	 1 	 (0.00)
+Bucket[ 2 Fill]: 	 12 	 (0.04)
+Bucket[ 3 Fill]: 	 53 	 (0.16)
+Bucket[ 4 Fill]: 	 200 	 (0.61)
+Bucket[ 5 Fill]: 	 710 	 (2.17)
+Bucket[ 6 Fill]: 	 1889 	 (5.76)
+Bucket[ 7 Fill]: 	 4016 	 (12.26)
+Bucket[ 8 Fill]: 	 7098 	 (21.66)
+Bucket[ 9 Fill]: 	 9306 	 (28.40)
+Bucket[10 Fill]: 	 7290 	 (22.25)
+Bucket[11 Fill]: 	 2193 	 (6.69)
 Bucket[12 Fill]: 	 0 	 (0.00)
 Bucket[13 Fill]: 	 0 	 (0.00)
 Bucket[14 Fill]: 	 0 	 (0.00)
@@ -40,18 +64,18 @@ Bucket[16 Fill]: 	 0 	 (0.00)
 Distribution of Bucket-Occupancy (Averaged across Ball Throws) => Used for P(Bucket = k balls) calculation 
 
 Occupancy: 		            Count 	 P(Bucket=k balls)
-Bucket[ 0 Fill]: 	            80138 	 (0.000)
-Bucket[ 1 Fill]: 	          1277518 	 (0.006)
-Bucket[ 2 Fill]: 	         10211726 	 (0.051)
-Bucket[ 3 Fill]: 	         54444444 	 (0.272)
-Bucket[ 4 Fill]: 	        217345091 	 (1.087)
-Bucket[ 5 Fill]: 	        689616006 	 (3.448)
-Bucket[ 6 Fill]: 	       1781332607 	 (8.907)
-Bucket[ 7 Fill]: 	       3692545543 	 (18.463)
-Bucket[ 8 Fill]: 	       5686733584 	 (28.434)
-Bucket[ 9 Fill]: 	       5414236864 	 (27.071)
-Bucket[10 Fill]: 	       2234997914 	 (11.175)
-Bucket[11 Fill]: 	        217178565 	 (1.086)
+Bucket[ 0 Fill]: 	            43655 	 (0.000)
+Bucket[ 1 Fill]: 	           716386 	 (0.004)
+Bucket[ 2 Fill]: 	          5901035 	 (0.030)
+Bucket[ 3 Fill]: 	         32307444 	 (0.162)
+Bucket[ 4 Fill]: 	        132112801 	 (0.661)
+Bucket[ 5 Fill]: 	        428489356 	 (2.142)
+Bucket[ 6 Fill]: 	       1136802086 	 (5.684)
+Bucket[ 7 Fill]: 	       2481632516 	 (12.408)
+Bucket[ 8 Fill]: 	       4343293109 	 (21.716)
+Bucket[ 9 Fill]: 	       5688271660 	 (28.441)
+Bucket[10 Fill]: 	       4420757106 	 (22.104)
+Bucket[11 Fill]: 	       1329672846 	 (6.648)
 Bucket[12 Fill]: 	                0 	 (0.000)
 Bucket[13 Fill]: 	                0 	 (0.000)
 Bucket[14 Fill]: 	                0 	 (0.000)
@@ -62,23 +86,23 @@ Bucket[16 Fill]: 	                0 	 (0.000)
 Distribution of Balls-in-Dest-Bucket on Ball-Insertion (Best-Of-2 Indexed-Buckets) => Spill-Count = Spills from Bucket-With-11-Balls
 
 Balls-in-Dest-Bucket (k) 		 Spills from Bucket-With-k-Balls)
- 0:				            80138	 (0.001)
- 1:				          1277467	 (0.013)
- 2:				         10208420	 (0.102)
- 3:				         54338920	 (0.543)
- 4:				        215448142	 (2.154)
- 5:				        667962759	 (6.680)
- 6:				       1615336195	 (16.153)
- 7:				       2843151086	 (28.432)
- 8:				       3045209016	 (30.452)
- 9:				       1396648527	 (13.966)
-10:				        149160681	 (1.492)
-11:				          1178649	 (0.012)
+ 0:				            43655	 (0.000)
+ 1:				           716367	 (0.007)
+ 2:				          5899969	 (0.059)
+ 3:				         32270687	 (0.323)
+ 4:				        131420900	 (1.314)
+ 5:				        420233058	 (4.202)
+ 6:				       1070429973	 (10.704)
+ 7:				       2112242956	 (21.122)
+ 8:				       2955700950	 (29.557)
+ 9:				       2444334519	 (24.443)
+10:				        782489543	 (7.825)
+11:				         44217423	 (0.442)
 12:				                0	 (0.000)
 13:				                0	 (0.000)
 14:				                0	 (0.000)
 15:				                0	 (0.000)
 
-Spill Count: 1178649 (0.012)
+Spill Count: 44217423 (0.442)
 
-Cuckoo Spill Count: 12790 (0.000)
+Cuckoo Spill Count: 3156841 (0.032)
