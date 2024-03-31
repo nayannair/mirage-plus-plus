@@ -12,8 +12,6 @@
 //#define SKEW_SIZE total_assocs_per_skew*sets
 //#define SET_SIZE total_assocs_per_skew
 
-
-
 typedef struct dataEntry;
 
 typedef struct tagEntry
@@ -58,6 +56,10 @@ typedef struct dataStore{
   dataEntry* entries;
 } dataStore;
 
+typedef struct {
+    uint64_t* entries;
+} PrinceHashTable;
+
 typedef struct mirageCache{
   
   tagStore* TagStore;
@@ -85,8 +87,7 @@ typedef struct mirageCache{
 
   //seed for hash function per skew
   uns64 seed[NUM_SKEW];
-
-
+ 
 } mirageCache;
 
 
@@ -95,7 +96,7 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews );
 // Access Mirage LLC
 Flag mirage_access (mirageCache *c, Addr addr);
 // Hash function 
-Addr mirage_hash(uns skew, Addr addr);
+Addr mirage_hash(uns seed, Addr addr, int skew);
 // Cache install
 void mirage_install (mirageCache *c, Addr addr);
 // Select skew 

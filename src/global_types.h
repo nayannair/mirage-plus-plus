@@ -18,11 +18,18 @@
 #define SAT_INC(x,max)   (x<max)? x+1:x
 #define SAT_DEC(x)       (x>0)? x-1:0
 
-#define EXTRA_WAYS 6
-#define NUM_SETS 16384
+#define TABLE_SIZE MEM_SIZE_MB*1024*1024/LINESIZE
+
+#define EXTRA_WAYS 4
+
+#define CACHE_SIZE 16*1024*1024
+#define NUM_LINES_IN_MEM CACHE_SIZE/LINESIZE
 #define NUM_ASSOCS 8
 #define NUM_SKEW 2
-#define NUM_LINES_IN_MEM MEM_SIZE_MB*1024*1024/LINESIZE
+//#define NUM_SETS NUM_LINES_IN_MEM/NUM_ASSOCS
+#define NUM_SETS 16384
+#define SKEW_SIZE NUM_SETS*(NUM_ASSOCS+EXTRA_WAYS)
+#define SET_SIZE (NUM_ASSOCS+EXTRA_WAYS)
 /* Renames -- Try to use these rather than built-in C types for portability */
 
 

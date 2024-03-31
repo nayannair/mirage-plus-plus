@@ -4,8 +4,7 @@
 // Power of 2 choices --> random skew selection only works for 2 skews. Generalize for > 2
 // implement write/read functionality and dirty writebacks
 
-#define SKEW_SIZE 16384*14
-#define SET_SIZE 14
+PrinceHashTable *PHT0,*PHT1;
 
 MTRand *mtrand=new MTRand(42);
 
@@ -33,6 +32,21 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->TagStore->entries = (tagEntry*) calloc(num_entries_tag,sizeof(tagEntry));        // How to index skews
     c->DataStore->entries = (dataEntry*) calloc(num_entries_data,sizeof(dataEntry));    // sum*assocs = lines
     c->DataStore->num_lines = skews*sets*base_assocs;
+
+    //Instantiating Prince Hash Table
+    PHT0 = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
+    PHT1 = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
+
+    PHT0->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
+    PHT1->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
+ 
+    
+    for(uns64 i=0; i < TABLE_SIZE; i++)
+    {
+    	   PHT0->entries[i] = -1;
+	   PHT1->entries[i] = -1;
+	   //printf("Addr %llu value set to %lld\n",i,PHT->entries[i]);
+    }  
 
     c->s_count = 0; // number of accesses
     c->s_miss  = 0; // number of misses
@@ -101,7 +115,7 @@ Flag mirage_access (mirageCache *c, Addr addr)
     for(int i =0 ; i<c->TagStore->skews; i++)
     {
         
-        c->skew_set_index_arr[i] = mirage_hash(c->seed[i],addr);
+        c->skew_set_index_arr[i] = mirage_hash(c->seed[i],addr,i);
         //assert (skew_set_index == c->princeHashTable0[addr]);
         //assert (skew_set_index == c->princeHashTable1[addr]);
 
@@ -313,12 +327,32 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
 }
 
 // Return hashed addr
-Addr mirage_hash(uns seed, Addr addr)
+Addr mirage_hash(uns seed, Addr addr, int skew)
 {
     //return addr % NUM_SETS;
-    //PRINCE Cipher with skew number as the seed
-    Addr hashed_addr = calcPRINCE64(addr, seed) % NUM_SETS;
-    return hashed_addr;
+    //PRINCE Cipher with random number as the seed
+   Addr hashed_addr;
+   Addr l_addr_bits = addr & 0xFFFFFFFFFF;
+   //printf("Addr accessed in Hash Table! Addr: %llu\n",addr);
+
+   PrinceHashTable* PHT_c = skew? PHT1:PHT0;
+
+   if(PHT_c->entries[l_addr_bits] != -1)
+   {
+	//printf("Addr Exists in Hash Table! Addr: %llu\n",addr);
+	hashed_addr = PHT_c->entries[l_addr_bits];
+	//printf("Addr Exists in Hash Table! Addr: %llu\n",addr);
+   }
+   else
+   {
+        //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
+	PHT_c->entries[l_addr_bits] = calcPRINCE64(addr, seed) % NUM_SETS;
+	hashed_addr = PHT_c->entries[l_addr_bits];
+        //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
+
+   }
+   //hashed_addr = calcPRINCE64(addr, seed) % NUM_SETS;
+   return hashed_addr;
     
 }
 
