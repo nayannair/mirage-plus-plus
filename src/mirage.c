@@ -266,8 +266,9 @@ uns64 mirageGLE(mirageCache *c)
     c->m_gle++;
     //printf("Random Global Eviction\n");
     //Choose a line from data store randomly for eviction
-    uns64 line_to_evict = mtrand->randInt(c->DataStore->num_lines - 1);
-    assert (line_to_evict < c->DataStore->num_lines);
+    uns64 line_to_evict = mtrand->randInt(c->DataStore->num_lines - 1) % (c->DataStore->num_lines);//rand() % c->DataStore->num_lines;
+    //uns64 line_to_evict = mtrand->randInt(c->DataStore->num_lines - 1);
+    //assert (line_to_evict < c->DataStore->num_lines);
     //Writeback if dirty
     if (c->DataStore->entries[line_to_evict].rPtr->dirty)
     {
@@ -337,8 +338,8 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         {
             equals.push_back(i);
             equal_count = invalid_tags;
-            skew_select = mtrand->randInt(equals.size() - 1);
-            assert (skew_select < equals.size());
+            skew_select = mtrand->randInt(equals.size() - 1) % (equals.size());
+            //assert (skew_select < equals.size());
             skew_select_equals = equals[skew_select];
         }
     }
