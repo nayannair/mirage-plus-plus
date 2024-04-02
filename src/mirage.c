@@ -343,9 +343,9 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
             }
             equals.push_back(i);
             equal_count = invalid_tags;
-            skew_select = mtrand->randInt(equals.size() - 1) % (equals.size());
+            //skew_select = mtrand->randInt(equals.size() - 1) % (equals.size());
             //assert (skew_select < equals.size());
-            skew_select_equals = equals[skew_select];
+            skew_select_equals = equals[mtrand->randInt(equals.size() - 1) % (equals.size())];
         }
     }
     
