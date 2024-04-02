@@ -1,5 +1,5 @@
 RM        := /bin/rm -rf
-SIM       := ./sim
+SIM       := ./mirage
 CC        := g++
 CFLAGS    := -lz -O2 -lm  -W -Wall -Wno-deprecated -Wno-unknown-warning-option -Wno-self-assign -Wno-unused-parameter -Wno-unused-but-set-variable
 DFLAGS    := -pg -g
