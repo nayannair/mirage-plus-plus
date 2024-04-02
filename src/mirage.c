@@ -43,8 +43,8 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     
     for(uns64 i=0; i < TABLE_SIZE; i++)
     {
-    	   PHT0->entries[i] = -1;
-	   PHT1->entries[i] = -1;
+        PHT0->entries[i] = -1;
+	    PHT1->entries[i] = -1;
 	   //printf("Addr %llu value set to %lld\n",i,PHT->entries[i]);
     }  
 
@@ -87,23 +87,6 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
 
     c->DataStore->isFull = FALSE;
 
-    /*
-    c->princeHashTable0 = (Addr*) calloc(NUM_LINES_IN_MEM,sizeof(Addr));
-    c->princeHashTable1 = (Addr*) calloc(NUM_LINES_IN_MEM,sizeof(Addr));
-
-    //Initilize hash table
-    
-    for(int j =0; j < MEM_SIZE_MB*1024*1024/LINESIZE; j++)
-    {
-        c->princeHashTable0[j] = calcPRINCE64(j, rand()) % NUM_SETS;
-    }
-
-    for(int j =0; j < MEM_SIZE_MB*1024*1024/LINESIZE; j++)
-    {
-        c->princeHashTable1[j] = calcPRINCE64(j, rand()) % NUM_SETS;
-    }*/
-    
-
     return c;
 }
 
@@ -118,7 +101,6 @@ Flag mirage_access (mirageCache *c, Addr addr)
         c->skew_set_index_arr[i] = mirage_hash(c->seed[i],addr,i);
         //assert (skew_set_index == c->princeHashTable0[addr]);
         //assert (skew_set_index == c->princeHashTable1[addr]);
-
 
         Addr incoming_tag = addr; //Full 40-bit tag
 
@@ -137,6 +119,21 @@ Flag mirage_access (mirageCache *c, Addr addr)
                 return HIT;
             }
         }
+
+        //If not in base ways, check in allocated tag pool.
+        for(uint32_t w=0; w < c->dynTagPool.size(); w++)
+        {
+            if(c->dynTagPool[w].skewID == i && c->dynTagPool[w].setID == c->skew_set_index_arr[i])
+            {
+                if(c->dynTagPool[w].tag_entry.valid && incoming_tag == c->dynTagPool[w].tag_entry.full_tag)
+                {
+                    c->s_hits++;
+                    c->m_hits[i][c->skew_set_index_arr[i]]++;
+                    return HIT;
+                }
+            }
+        }
+
         c->m_miss[i][c->skew_set_index_arr[i]]++;
 
     }
@@ -159,20 +156,20 @@ void mirage_install (mirageCache *c, Addr addr)
     if(tagSAE)
     {
         //Invalidate from Tag Store and evict corresponding Data Store entry and replace with new line
-        uns way_select = rand() % c->TagStore->total_assocs_per_skew;   //Can possibly implement some kind of replacement policy here
-        //uns set_select = mirage_hash(skew_select,addr);
-        uns set_select = skew_select ? c->skew_set_index_arr[1] : c->skew_set_index_arr[0]; //Only works for 2 skews. 
+        //uns way_select = rand() % c->TagStore->total_assocs_per_skew;   //Can possibly implement some kind of replacement policy here
+        uns set_select = skew_select ? c->skew_set_index_arr[1] : c->skew_set_index_arr[0]; //Only works for 2 skews.
 
-        //Writeback if dirty
-        //if (c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty)
-        //{
-        //    printf("Writeback!\n");
-        //}
+        //Allocate a new tag from pool
+        uint32_t insert_id = allocateTag(c,skew_select,set_select);
+        c->dynTagPool[insert_id].tag_entry.full_tag = addr;
+        c->dynTagPool[insert_id].tag_entry.dirty = FALSE;
+        c->dynTagPool[insert_id].tag_entry.valid = TRUE;
+        //Also assign the forward pointer and reverse pointer but functionally superfluous
 
-        c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].full_tag = addr;
-        c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty = FALSE; 
-        c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].valid = TRUE;
-        //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].fPtr->Data = 0;   //Use incoming data if needed
+
+        //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].full_tag = addr;
+        //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty = FALSE; 
+        //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].valid = TRUE;
         return;
     }
     //Only proceeds beyond this point if there are invalid tags present
@@ -216,6 +213,20 @@ void mirage_install (mirageCache *c, Addr addr)
         }
     }
 
+    //If not in main tagstore, evict from dynamic pool
+    for(uint32_t i =0; i<c->dynTagPool.size(); i++)
+    {
+        if( (c->dynTagPool[i].skewID==skew_select) && (c->dynTagPool[i].setID==c->skew_set_index_arr[skew_select]) && (!c->dynTagPool[i].tag_entry.valid) )
+        {
+            c->dynTagPool[i].tag_entry.fPtr = &(c->DataStore->entries[evicted_line_index]); 
+            c->dynTagPool[i].tag_entry.valid = TRUE;
+            c->dynTagPool[i].tag_entry.full_tag = addr;
+            tagPtr = &(c->dynTagPool[i].tag_entry);  
+            c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
+            break;
+        }
+    }
+
     int ways_used = 0;
     for(int i=0; i< c->TagStore->total_assocs_per_skew; i++)
     {
@@ -230,12 +241,10 @@ void mirage_install (mirageCache *c, Addr addr)
     if(tagPtr)
     {
         //printf("installing in Data Store: %lu\n",evicted_line_index);
-
         c->DataStore->entries[evicted_line_index].Data = 0; //Shouldn't matter
         c->DataStore->entries[evicted_line_index].rPtr = tagPtr;
         return;
     }
-
 }
 
 
@@ -282,7 +291,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
 
         //printf("checking entry %lu\n",i*SKEW_SIZE+skew_set_index*SET_SIZE);
 
-        //Check for invalid tags
+        //Check for invalid tags in base
         for(int j =0; j < c->TagStore->total_assocs_per_skew ; j++)
         {
             if(!(c->TagStore->entries[i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j].valid))
@@ -290,6 +299,15 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
                 invalid_tags++;
             }
         }
+        //Tags in the common pool
+        for(uint32_t j=0; j < c->dynTagPool.size(); j++)
+        {
+            if(!(c->dynTagPool[j].tag_entry.valid) && (c->dynTagPool[j].skewID == i) && (c->dynTagPool[j].setID ==c->skew_set_index_arr[i]))
+            {
+                invalid_tags++;
+            }
+        }
+
 
         if(invalid_tags > max_invalid_tags)
         {
@@ -345,15 +363,25 @@ Addr mirage_hash(uns seed, Addr addr, int skew)
    }
    else
    {
-        //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
+    //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
 	PHT_c->entries[l_addr_bits] = calcPRINCE64(addr, seed) % NUM_SETS;
 	hashed_addr = PHT_c->entries[l_addr_bits];
-        //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
-
+    //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
    }
    //hashed_addr = calcPRINCE64(addr, seed) % NUM_SETS;
    return hashed_addr;
-    
+}
+
+// Allocate tags from the pool
+uint32_t allocateTag(mirageCache* c, int skewID, uns64 setID)
+{
+    //Allocate a tagEntry from the dynamic tag pool
+    dynTagEntry newEntry;
+    newEntry.setID = setID;
+    newEntry.skewID = skewID;
+    c->dynTagPool.push_back(newEntry);
+    uint32_t index = c->dynTagPool.size();
+    return index;
 }
 
 // Print Stats
@@ -365,6 +393,8 @@ void mirage_print_stats(mirageCache *c, char *header)
   printf("\n%s_INSTALLS     \t : %llu",  header,  c->s_installs);
   printf("\n%s_EVICTS       \t : %llu",  header,  c->s_evict);
   printf("\n%s_SAE_EVICTS   \t : %llu",  header,  c->m_sae);
+
+  printf("\n%s_DYNAMIC_TAG_POOL_SIZE \t : %llu",  header, c->dynTagPool.size());
 
   printf("\n---------------------SKEW-SET-DISTRIBUTION----------------------\n");
   printf("\n---------------------     WAYS USED       ----------------------\n");
