@@ -1,5 +1,6 @@
 #include "mirage.h"
 #include "prince.h"
+#include <vector>
 //TODO
 // Power of 2 choices --> random skew selection only works for 2 skews. Generalize for > 2
 // implement write/read functionality and dirty writebacks
@@ -315,8 +316,12 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         }
         //To randomize skew selection if same num of invalid tags in two skews
         // Only works for 2 skews. Generalize for > 2
-        else if((invalid_tags == max_invalid_tags) && (invalid_tags != 0))
+        else if((invalid_tags >= equal_count))
         {
+            if (invalid_tags > equal_count)
+            {
+                equals.clear();
+            }
             equals.push_back(i);
             equal_count = invalid_tags;
             skew_select = mtrand->randInt(equals.size() - 1) % (equals.size());
@@ -343,7 +348,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
     }
 
     //*skew_set_index = c->skew_set_index_arr[skew_select];
-    if (equal_count != max_invalid_tags)
+    if (max_invalid_tags > equal_count)
         return skew_select;
     else
         return skew_select_equals;
