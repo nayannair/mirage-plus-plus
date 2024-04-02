@@ -8,9 +8,11 @@
 #include <time.h>
 #include <assert.h>
 #include "externs.h"
+#include <vector>
 
 //#define SKEW_SIZE total_assocs_per_skew*sets
 //#define SET_SIZE total_assocs_per_skew
+
 
 typedef struct dataEntry;
 
@@ -60,6 +62,13 @@ typedef struct {
     uint64_t* entries;
 } PrinceHashTable;
 
+//dynamic tag pool
+typedef struct dynTagEntry{
+  uns64 setID;
+  int skewID;
+  tagEntry tag_entry;
+} dynTagEntry;
+
 typedef struct mirageCache{
   
   tagStore* TagStore;
@@ -88,6 +97,9 @@ typedef struct mirageCache{
 
   //seed for hash function per skew
   uns64 seed[NUM_SKEW];
+
+  //dynamic tag pool
+  std::vector<dynTagEntry> dynTagPool;
  
 } mirageCache;
 
@@ -104,6 +116,9 @@ void mirage_install (mirageCache *c, Addr addr);
 uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE);
 //Global eviction
 uns64 mirageGLE(mirageCache *c);
+
+uint32_t allocateTag(mirageCache* c, int skewID, uns64 setID);
+
 
 void mirage_print_stats(mirageCache *c, char *header);
 
