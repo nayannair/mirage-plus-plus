@@ -9,6 +9,7 @@
 #include <assert.h>
 #include "externs.h"
 #include <vector>
+#include <unordered_map>
 
 //#define SKEW_SIZE total_assocs_per_skew*sets
 //#define SET_SIZE total_assocs_per_skew
@@ -64,7 +65,6 @@ typedef struct {
 
 //dynamic tag pool
 typedef struct dynTagEntry{
-  uns64 setID;
   int skewID;
   tagEntry tag_entry;
 } dynTagEntry;
@@ -94,12 +94,14 @@ typedef struct mirageCache{
   uns64 m_gle;
   uns64 m_sae;
   uns64 max_ways_used[NUM_SKEW][NUM_SETS];
+  uns64 max_extra_pool_valid_used[NUM_SKEW][NUM_SETS];
+  uns64 max_total_extra_pool_used[NUM_SKEW][NUM_SETS];
 
   //seed for hash function per skew
   uns64 seed[NUM_SKEW];
 
   //dynamic tag pool
-  std::vector<dynTagEntry> dynTagPool;
+  std::unordered_map<uns64, std::vector<dynTagEntry> > dynTagPool;
  
 } mirageCache;
 

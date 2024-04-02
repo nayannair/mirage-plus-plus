@@ -123,6 +123,21 @@ Flag mirage_access (mirageCache *c, Addr addr)
         }
 
         //If not in base ways, check in allocated tag pool.
+        //Extra pool has allocation for the set
+        if (c->dynTagPool.find(c->skew_set_index_arr[i]) != c->dynTagPool.end())
+        {
+            for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[i]].size(); w++)
+            {
+                if ((c->dynTagPool[c->skew_set_index_arr[i]][w].skewID == i) && (c->dynTagPool[c->skew_set_index_arr[i]][w].tag_entry.valid) && (incoming_tag == c->dynTagPool[c->skew_set_index_arr[i]][w].tag_entry.full_tag) )
+                {
+                    c->s_hits++;
+                    c->m_hits[i][c->skew_set_index_arr[i]]++;
+                    return HIT;
+                }
+            }
+        }
+        
+        /*
         for(uint32_t w=0; w < c->dynTagPool.size(); w++)
         {
             if(c->dynTagPool[w].skewID == i && c->dynTagPool[w].setID == c->skew_set_index_arr[i])
@@ -135,6 +150,7 @@ Flag mirage_access (mirageCache *c, Addr addr)
                 }
             }
         }
+        */
 
         c->m_miss[i][c->skew_set_index_arr[i]]++;
 
@@ -154,28 +170,7 @@ void mirage_install (mirageCache *c, Addr addr)
     Addr skew_set_index;
     uns skew_select = skewSelect(c,addr, &tagSAE);
     
-    //Check if tagStore has SAE
-    if(tagSAE)
-    {
-        //Invalidate from Tag Store and evict corresponding Data Store entry and replace with new line
-        //uns way_select = rand() % c->TagStore->total_assocs_per_skew;   //Can possibly implement some kind of replacement policy here
-        uns set_select = c->skew_set_index_arr[skew_select];
-
-        //Allocate a new tag from pool
-        uint32_t insert_id = allocateTag(c,skew_select,set_select);
-        c->dynTagPool[insert_id].tag_entry.full_tag = addr;
-        c->dynTagPool[insert_id].tag_entry.dirty = FALSE;
-        c->dynTagPool[insert_id].tag_entry.valid = TRUE;
-        //Also assign the forward pointer and reverse pointer but functionally superfluous
-
-
-        //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].full_tag = addr;
-        //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty = FALSE; 
-        //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].valid = TRUE;
-
-        return;
-    }
-    //Only proceeds beyond this point if there are invalid tags present
+    //Always proceeds - no SAE
 
     uint64_t evicted_line_index; 
 
@@ -199,6 +194,7 @@ void mirage_install (mirageCache *c, Addr addr)
 
     //Install Line
     tagEntry* tagPtr = NULL;
+    bool found_in_base = false;
     //Tag Store
     for (int i =0 ; i < c->TagStore->total_assocs_per_skew ; i++)
     {
@@ -213,26 +209,67 @@ void mirage_install (mirageCache *c, Addr addr)
             tagPtr = &(c->TagStore->entries[llc_index]);
             c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
             //printf("Skew %lu, set %lu has %lu installs\n",skew_select,skew_set_index,c->s_distribution[skew_select][skew_set_index]);
+            found_in_base = true;
             break;
         }
     }
 
     //If not in main tagstore, evict from dynamic pool
-    for(uint32_t i =0; i<c->dynTagPool.size(); i++)
+    if (!found_in_base)
     {
-        if( (c->dynTagPool[i].skewID==skew_select) && (c->dynTagPool[i].setID==c->skew_set_index_arr[skew_select]) && (!c->dynTagPool[i].tag_entry.valid) )
+        dynTagEntry tag_entry;
+        tag_entry.skewID = skew_select;
+        tag_entry.tag_entry.full_tag = addr;
+        tag_entry.tag_entry.fPtr = &(c->DataStore->entries[evicted_line_index]);
+        tag_entry.tag_entry.valid = TRUE;
+        tag_entry.tag_entry.dirty = FALSE;
+
+        std::vector<dynTagEntry> tag_entry_v;
+        tag_entry_v.push_back(tag_entry);
+
+        //if setID is found
+        if (c->dynTagPool.find(c->skew_set_index_arr[skew_select]) != c->dynTagPool.end())
         {
-            c->dynTagPool[i].tag_entry.fPtr = &(c->DataStore->entries[evicted_line_index]); 
-            c->dynTagPool[i].tag_entry.valid = TRUE;
-            c->dynTagPool[i].tag_entry.full_tag = addr;
-            tagPtr = &(c->dynTagPool[i].tag_entry);  
+            //invalid tag found
+            bool invalid_tag_found = false;
+            for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[skew_select]].size(); w++)
+            {
+                if ((c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == skew_select) && (!c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry.valid))
+                {
+                    invalid_tag_found = true;
+                    c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry = tag_entry.tag_entry;
+                    
+                    tagPtr = &(c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry);
+                    c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
+                    break;
+                }
+            }
+            if (!invalid_tag_found)
+            {
+                c->dynTagPool[c->skew_set_index_arr[skew_select]].push_back(tag_entry);
+                int index = c->dynTagPool[c->skew_set_index_arr[skew_select]].size() - 1;
+
+                tagPtr = &(c->dynTagPool[c->skew_set_index_arr[skew_select]][index].tag_entry);
+                c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
+            }
+        }
+        //set ID is not found, insert
+        else
+        {
+            //c->dynTagPool[c->skew_set_index_arr[skew_select]] = std::vector<dynTagEntry>{tag_entry};
+            c->dynTagPool[c->skew_set_index_arr[skew_select]] = tag_entry_v;
+            //Umapsptr->node_index->emplace(5, 10);
+            tagPtr = &(c->dynTagPool[c->skew_set_index_arr[skew_select]][0].tag_entry);  
             c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
-            break;
         }
     }
 
     int ways_used = 0;
+    int extra_pool_valid = 0;
+    int extra_pool = 0;
+
     uns64 set_index = (skew_select*SKEW_SIZE)+(c->skew_set_index_arr[skew_select]*SET_SIZE);
+    //base ways check
     for(int i=0; i< c->TagStore->total_assocs_per_skew; i++)
     {
         uns64 llc_index = set_index+i;
@@ -241,11 +278,38 @@ void mirage_install (mirageCache *c, Addr addr)
             ways_used++;
         }
     }
+    //Pool check
+    //if setID is found
+    if (c->dynTagPool.find(c->skew_set_index_arr[skew_select]) != c->dynTagPool.end())
+    {
+        for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[skew_select]].size(); w++)
+        {
+            if (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == skew_select)
+            {
+
+                if (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry.valid)
+                    extra_pool_valid++;
+                extra_pool++;
+            }
+        }
+    }
+
+
+    //TODO :: fix this for dyn-tag-alloc
     if (ways_used > c->max_ways_used[skew_select][c->skew_set_index_arr[skew_select]])
     {
         c->max_ways_used[skew_select][c->skew_set_index_arr[skew_select]] = ways_used;
     }
 
+    if (extra_pool_valid > c->max_extra_pool_valid_used[skew_select][c->skew_set_index_arr[skew_select]])
+    {
+        c->max_extra_pool_valid_used[skew_select][c->skew_set_index_arr[skew_select]] = extra_pool_valid;
+    }
+    
+    if (extra_pool > c->max_total_extra_pool_used[skew_select][c->skew_set_index_arr[skew_select]])
+    {
+        c->max_total_extra_pool_used[skew_select][c->skew_set_index_arr[skew_select]] = extra_pool;
+    }
 
     //printf("Ways used for skew %lu, set %lu: %lu\n",skew_select,skew_set_index,ways_used);
 
@@ -291,7 +355,8 @@ uns64 mirageGLE(mirageCache *c)
 // Select skew to install based on power of 2 choices
 uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
 {
-    uns max_invalid_tags = 0;
+    //Arbitrary upper threshold for max tags possibly used by a set
+    uns min_tags_used = 1000;
     uns equal_count = 0;
     
     uns skew_select;
@@ -305,44 +370,45 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         //Calculate skew index
         //skew_set_index_loc[i] = mirage_hash(i,addr);
         //Addr skew_set_index = 5;
-        uns invalid_tags = 0;
+        uns used_tags = 0;
 
         //printf("checking entry %lu\n",i*SKEW_SIZE+skew_set_index*SET_SIZE);
 
-        //Check for invalid tags in base
+        //Check for valid tags in base
         for(int j =0; j < c->TagStore->total_assocs_per_skew ; j++)
         {
-            uns64 llc_index = i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j;
-            if(!(c->TagStore->entries[llc_index].valid))
+            uns64 llc_index = (i*SKEW_SIZE) + (c->skew_set_index_arr[i]*SET_SIZE) + j;
+            if((c->TagStore->entries[llc_index].valid))
             {
-                invalid_tags++;
-            }
-        }
-        //Tags in the common pool
-        for(uint32_t j=0; j < c->dynTagPool.size(); j++)
-        {
-            if(!(c->dynTagPool[j].tag_entry.valid) && (c->dynTagPool[j].skewID == i) && (c->dynTagPool[j].setID ==c->skew_set_index_arr[i]))
-            {
-                invalid_tags++;
+                used_tags++;
             }
         }
 
-
-        if(invalid_tags > max_invalid_tags)
+        //Entry found in the extra pool
+        if (c->dynTagPool.find(c->skew_set_index_arr[i]) != c->dynTagPool.end())
         {
-            max_invalid_tags = invalid_tags;
+            for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[i]].size(); w++)
+            {
+                if ((c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == i) && (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry.valid))
+                    used_tags++;
+            }
+        }
+
+        if(used_tags < min_tags_used)
+        {
+            min_tags_used = used_tags;
             skew_select = i;
         }
         //To randomize skew selection if same num of invalid tags in two skews
         // Only works for 2 skews. Generalize for > 2
-        else if((invalid_tags >= equal_count))
+        else if((used_tags <= equal_count))
         {
-            if (invalid_tags > equal_count)
+            if (used_tags < equal_count)
             {
                 equals.clear();
             }
             equals.push_back(i);
-            equal_count = invalid_tags;
+            equal_count = used_tags;
             //skew_select = mtrand->randInt(equals.size() - 1) % (equals.size());
             //assert (skew_select < equals.size());
             skew_select_equals = equals[mtrand->randInt(equals.size() - 1) % (equals.size())];
@@ -350,8 +416,8 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
     }
     
     //assert (max_invalid_tags != 0);
-
-    if(max_invalid_tags == 0)
+    //SAE NEVER
+    /*if(max_invalid_tags == 0)
     {
         //printf("No Invalid Tags! Perform SAE!\n");
         *tagSAE = TRUE;
@@ -364,10 +430,12 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
     else
     {
         *tagSAE = FALSE;
-    }
+    }*/
+
+    *tagSAE = FALSE;
 
     //*skew_set_index = c->skew_set_index_arr[skew_select];
-    if (max_invalid_tags > equal_count)
+    if (min_tags_used < equal_count)
         return skew_select;
     else
         return skew_select_equals;
@@ -402,6 +470,7 @@ Addr mirage_hash(uns seed, Addr addr, int skew)
 }
 
 // Allocate tags from the pool
+/*
 uint32_t allocateTag(mirageCache* c, int skewID, uns64 setID)
 {
     //Allocate a tagEntry from the dynamic tag pool
@@ -412,6 +481,7 @@ uint32_t allocateTag(mirageCache* c, int skewID, uns64 setID)
     uint32_t index = c->dynTagPool.size();
     return index;
 }
+*/
 
 // Print Stats
 void mirage_print_stats(mirageCache *c, char *header)
@@ -448,6 +518,16 @@ void mirage_print_stats(mirageCache *c, char *header)
     for(uint64_t j=0 ; j < NUM_SKEW; j++)
     {
         printf("%lu \t\t",c->max_ways_used[j][i]);
+    }
+
+    for(uint64_t j=0 ; j < NUM_SKEW; j++)
+    {
+        printf("%lu \t\t",c->max_extra_pool_valid_used[j][i]);
+    }
+    
+    for(uint64_t j=0 ; j < NUM_SKEW; j++)
+    {
+        printf("%lu \t\t",c->max_total_extra_pool_used[j][i]);
     }
 
     printf("\n");
