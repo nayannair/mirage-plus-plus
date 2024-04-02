@@ -4,7 +4,7 @@
 // Power of 2 choices --> random skew selection only works for 2 skews. Generalize for > 2
 // implement write/read functionality and dirty writebacks
 
-PrinceHashTable *PHT0,*PHT1;
+std::vector<PrinceHashTable*> PHT (NUM_SKEW);
 
 MTRand *mtrand=new MTRand(42);
 
@@ -34,18 +34,18 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->DataStore->num_lines = skews*sets*base_assocs;
 
     //Instantiating Prince Hash Table
-    PHT0 = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
-    PHT1 = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
-
-    PHT0->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
-    PHT1->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
- 
+    for (uns64 i=0; i<NUM_SKEW; i++)
+    {
+        PHT[i] = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
+        PHT[i]->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
+    }
     
     for(uns64 i=0; i < TABLE_SIZE; i++)
     {
-    	   PHT0->entries[i] = -1;
-	   PHT1->entries[i] = -1;
-	   //printf("Addr %llu value set to %lld\n",i,PHT->entries[i]);
+        for (uns64 j=0; j<NUM_SKEW; j++)
+        {
+            PHT[j]->entries[i] = -1;
+        }
     }  
 
     c->s_count = 0; // number of accesses
@@ -128,7 +128,8 @@ Flag mirage_access (mirageCache *c, Addr addr)
         for(int j =0; j< c->TagStore->total_assocs_per_skew; j++)
         {
             //printf("Comparing LineAddr:%llu with Full-Tag %llu\n",addr,c->TagStore->entries[i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j].full_tag);
-            if(c->TagStore->entries[i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j].valid && incoming_tag == c->TagStore->entries[i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j].full_tag )
+            uns64 llc_index = (i*SKEW_SIZE)+(c->skew_set_index_arr[i]*SET_SIZE)+j;
+            if((c->TagStore->entries[llc_index].valid) && (incoming_tag == c->TagStore->entries[llc_index].full_tag ))
             {
                 //Line Found in Tag Store
                 //printf("Line Found in Cache at entry! at SKEW: %lu, SET: %lu, Way: %lu\n",i,skew_set_index,j);
@@ -161,17 +162,17 @@ void mirage_install (mirageCache *c, Addr addr)
         //Invalidate from Tag Store and evict corresponding Data Store entry and replace with new line
         uns way_select = rand() % c->TagStore->total_assocs_per_skew;   //Can possibly implement some kind of replacement policy here
         //uns set_select = mirage_hash(skew_select,addr);
-        uns set_select = skew_select ? c->skew_set_index_arr[1] : c->skew_set_index_arr[0]; //Only works for 2 skews. 
+        uns set_select = c->skew_set_index_arr[skew_select]; //Only works for 2 skews. 
 
         //Writeback if dirty
         //if (c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty)
         //{
         //    printf("Writeback!\n");
         //}
-
-        c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].full_tag = addr;
-        c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty = FALSE; 
-        c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].valid = TRUE;
+        uns64 llc_index = skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select;
+        c->TagStore->entries[llc_index].full_tag = addr;
+        c->TagStore->entries[llc_index].dirty = FALSE; 
+        c->TagStore->entries[llc_index].valid = TRUE;
         //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].fPtr->Data = 0;   //Use incoming data if needed
         return;
     }
@@ -202,14 +203,15 @@ void mirage_install (mirageCache *c, Addr addr)
     //Tag Store
     for (int i =0 ; i < c->TagStore->total_assocs_per_skew ; i++)
     {
-        if(!c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i].valid)
+        uns64 llc_index = skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i;
+        if(!c->TagStore->entries[llc_index].valid)
         {
             //printf("installing in Tag Store: %lu\n",skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i);
 
-            c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i].fPtr = &(c->DataStore->entries[evicted_line_index]);
-            c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i].valid = TRUE;
-            c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i].full_tag = addr;
-            tagPtr = &(c->TagStore->entries[skew_select*SKEW_SIZE + c->skew_set_index_arr[skew_select]*SET_SIZE+i]);
+            c->TagStore->entries[llc_index].fPtr = &(c->DataStore->entries[evicted_line_index]);
+            c->TagStore->entries[llc_index].valid = TRUE;
+            c->TagStore->entries[llc_index].full_tag = addr;
+            tagPtr = &(c->TagStore->entries[llc_index]);
             c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
             //printf("Skew %lu, set %lu has %lu installs\n",skew_select,skew_set_index,c->s_distribution[skew_select][skew_set_index]);
             break;
@@ -217,13 +219,21 @@ void mirage_install (mirageCache *c, Addr addr)
     }
 
     int ways_used = 0;
+    uns64 set_index = (skew_select*SKEW_SIZE)+(c->skew_set_index_arr[skew_select]*SET_SIZE);
     for(int i=0; i< c->TagStore->total_assocs_per_skew; i++)
     {
-        if(c->TagStore->entries[skew_select*SKEW_SIZE+c->skew_set_index_arr[skew_select]*SET_SIZE+i].valid)
+        uns64 llc_index = set_index+i;
+        if(c->TagStore->entries[llc_index].valid)
         {
             ways_used++;
         }
     }
+    if (ways_used > c->max_ways_used[skew_select][c->skew_set_index_arr[skew_select]])
+    {
+        c->max_ways_used[skew_select][c->skew_set_index_arr[skew_select]] = ways_used;
+    }
+
+
     //printf("Ways used for skew %lu, set %lu: %lu\n",skew_select,skew_set_index,ways_used);
 
     //Data Store
@@ -240,14 +250,14 @@ void mirage_install (mirageCache *c, Addr addr)
 
 
 //Global Eviction from Data Store
-uns mirageGLE(mirageCache *c)
+uns64 mirageGLE(mirageCache *c)
 {
     c->s_evict++;
     c->m_gle++;
     //printf("Random Global Eviction\n");
     //Choose a line from data store randomly for eviction
-    uns64 line_to_evict = mtrand->randInt(c->DataStore->num_lines - 1) % (c->DataStore->num_lines);//rand() % c->DataStore->num_lines;
-
+    uns64 line_to_evict = mtrand->randInt(c->DataStore->num_lines - 1);
+    assert (line_to_evict < c->DataStore->num_lines);
     //Writeback if dirty
     if (c->DataStore->entries[line_to_evict].rPtr->dirty)
     {
@@ -270,7 +280,12 @@ uns mirageGLE(mirageCache *c)
 uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
 {
     uns max_invalid_tags = 0;
+    uns equal_count = 0;
+    
     uns skew_select;
+    uns skew_select_equals;
+    
+    std::vector<int> equals;
     //Addr skew_set_index_loc[NUM_SKEW];
 
     for(int i=0; i< c->TagStore->skews; i++)
@@ -285,7 +300,8 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         //Check for invalid tags
         for(int j =0; j < c->TagStore->total_assocs_per_skew ; j++)
         {
-            if(!(c->TagStore->entries[i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j].valid))
+            uns64 llc_index = i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j;
+            if(!(c->TagStore->entries[llc_index].valid))
             {
                 invalid_tags++;
             }
@@ -298,10 +314,13 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         }
         //To randomize skew selection if same num of invalid tags in two skews
         // Only works for 2 skews. Generalize for > 2
-        else if(invalid_tags == max_invalid_tags)
+        else if((invalid_tags == max_invalid_tags) && (invalid_tags != 0))
         {
-            //skew_select = rand() % 2;
-            skew_select = mtrand->randInt(1) % 2;
+            equals.push_back(i);
+            equal_count = invalid_tags;
+            skew_select = mtrand->randInt(equals.size() - 1);
+            assert (skew_select < equals.size());
+            skew_select_equals = equals[skew_select];
         }
     }
     
@@ -323,7 +342,10 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
     }
 
     //*skew_set_index = c->skew_set_index_arr[skew_select];
-    return skew_select;
+    if (equal_count != max_invalid_tags)
+        return skew_select;
+    else
+        return skew_select_equals;
 }
 
 // Return hashed addr
@@ -335,7 +357,7 @@ Addr mirage_hash(uns seed, Addr addr, int skew)
    Addr l_addr_bits = addr & 0xFFFFFFFFFF;
    //printf("Addr accessed in Hash Table! Addr: %llu\n",addr);
 
-   PrinceHashTable* PHT_c = skew? PHT1:PHT0;
+   PrinceHashTable* PHT_c = PHT[skew];
 
    if(PHT_c->entries[l_addr_bits] != -1)
    {
@@ -385,6 +407,12 @@ void mirage_print_stats(mirageCache *c, char *header)
         }
         printf("%lu \t\t",ways_used);
     }
+    //Max ways used
+    for(uint64_t j=0 ; j < NUM_SKEW; j++)
+    {
+        printf("%lu \t\t",c->max_ways_used[j][i]);
+    }
+
     printf("\n");
   }
 
