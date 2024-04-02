@@ -93,6 +93,7 @@ typedef struct mirageCache{
   uns64 m_access[NUM_SKEW][NUM_SETS];
   uns64 m_gle;
   uns64 m_sae;
+  uns64 max_ways_used[NUM_SKEW][NUM_SETS];
 
   //seed for hash function per skew
   uns64 seed[NUM_SKEW];
@@ -114,7 +115,7 @@ void mirage_install (mirageCache *c, Addr addr);
 // Select skew 
 uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE);
 //Global eviction
-uns mirageGLE(mirageCache *c);
+uns64 mirageGLE(mirageCache *c);
 
 uint32_t allocateTag(mirageCache* c, int skewID, uns64 setID);
 
