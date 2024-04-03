@@ -1,6 +1,7 @@
 #include "mirage.h"
 #include "prince.h"
 #include <vector>
+#include <functional>
 //TODO
 // Power of 2 choices --> random skew selection only works for 2 skews. Generalize for > 2
 // implement write/read functionality and dirty writebacks
@@ -124,11 +125,13 @@ Flag mirage_access (mirageCache *c, Addr addr)
 
         //If not in base ways, check in allocated tag pool.
         //Extra pool has allocation for the set
-        if (c->dynTagPool.find(c->skew_set_index_arr[i]) != c->dynTagPool.end())
+        bool found_set_in_pool = c->dynTagPool.find(c->skew_set_index_arr[i]) != c->dynTagPool.end();
+        if (found_set_in_pool)
         {
+            
             for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[i]].size(); w++)
             {
-                if ((c->dynTagPool[c->skew_set_index_arr[i]][w].skewID == i) && (c->dynTagPool[c->skew_set_index_arr[i]][w].tag_entry.valid) && (incoming_tag == c->dynTagPool[c->skew_set_index_arr[i]][w].tag_entry.full_tag) )
+                if ((c->dynTagPool[c->skew_set_index_arr[i]][w].claimed == true) && (c->dynTagPool[c->skew_set_index_arr[i]][w].skewID == i) && (c->dynTagPool[c->skew_set_index_arr[i]][w].tag_entry->valid) && (incoming_tag == c->dynTagPool[c->skew_set_index_arr[i]][w].tag_entry->full_tag) )
                 {
                     c->s_hits++;
                     c->m_hits[i][c->skew_set_index_arr[i]]++;
@@ -136,22 +139,6 @@ Flag mirage_access (mirageCache *c, Addr addr)
                 }
             }
         }
-        
-        /*
-        for(uint32_t w=0; w < c->dynTagPool.size(); w++)
-        {
-            if(c->dynTagPool[w].skewID == i && c->dynTagPool[w].setID == c->skew_set_index_arr[i])
-            {
-                if(c->dynTagPool[w].tag_entry.valid && incoming_tag == c->dynTagPool[w].tag_entry.full_tag)
-                {
-                    c->s_hits++;
-                    c->m_hits[i][c->skew_set_index_arr[i]]++;
-                    return HIT;
-                }
-            }
-        }
-        */
-
         c->m_miss[i][c->skew_set_index_arr[i]]++;
 
     }
@@ -210,6 +197,7 @@ void mirage_install (mirageCache *c, Addr addr)
             c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
             //printf("Skew %lu, set %lu has %lu installs\n",skew_select,skew_set_index,c->s_distribution[skew_select][skew_set_index]);
             found_in_base = true;
+            
             break;
         }
     }
@@ -217,29 +205,34 @@ void mirage_install (mirageCache *c, Addr addr)
     //If not in main tagstore, evict from dynamic pool
     if (!found_in_base)
     {
+        std::cout << "FINALLY A LEAD!" << std::endl;
         dynTagEntry tag_entry;
+        tag_entry.claimed = true;
         tag_entry.skewID = skew_select;
-        tag_entry.tag_entry.full_tag = addr;
-        tag_entry.tag_entry.fPtr = &(c->DataStore->entries[evicted_line_index]);
-        tag_entry.tag_entry.valid = TRUE;
-        tag_entry.tag_entry.dirty = FALSE;
+        tag_entry.tag_entry = (tagEntry*) calloc(1, sizeof(tagEntry));
+        tag_entry.tag_entry->full_tag = addr;
+        tag_entry.tag_entry->fPtr = &(c->DataStore->entries[evicted_line_index]);
+        tag_entry.tag_entry->valid = TRUE;
+        tag_entry.tag_entry->dirty = FALSE;
+        
 
         std::vector<dynTagEntry> tag_entry_v;
         tag_entry_v.push_back(tag_entry);
-
+        
         //if setID is found
         if (c->dynTagPool.find(c->skew_set_index_arr[skew_select]) != c->dynTagPool.end())
         {
+            std::cout << "HERE - TRUE" << std::endl;
             //invalid tag found
             bool invalid_tag_found = false;
             for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[skew_select]].size(); w++)
             {
-                if ((c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == skew_select) && (!c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry.valid))
+                if ((c->dynTagPool[c->skew_set_index_arr[skew_select]][w].claimed == true) && (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == skew_select) && (!c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry->valid))
                 {
                     invalid_tag_found = true;
                     c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry = tag_entry.tag_entry;
                     
-                    tagPtr = &(c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry);
+                    tagPtr = (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry);
                     c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
                     break;
                 }
@@ -249,18 +242,22 @@ void mirage_install (mirageCache *c, Addr addr)
                 c->dynTagPool[c->skew_set_index_arr[skew_select]].push_back(tag_entry);
                 int index = c->dynTagPool[c->skew_set_index_arr[skew_select]].size() - 1;
 
-                tagPtr = &(c->dynTagPool[c->skew_set_index_arr[skew_select]][index].tag_entry);
+                tagPtr = (c->dynTagPool[c->skew_set_index_arr[skew_select]][index].tag_entry);
                 c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
             }
         }
         //set ID is not found, insert
         else
         {
+            std::cout << "HERE - FALSE" << std::endl;
             //c->dynTagPool[c->skew_set_index_arr[skew_select]] = std::vector<dynTagEntry>{tag_entry};
-            c->dynTagPool[c->skew_set_index_arr[skew_select]] = tag_entry_v;
+            //c->dynTagPool[c->skew_set_index_arr[skew_select]] = tag_entry_v;
+            c->dynTagPool.insert(std::make_pair(c->skew_set_index_arr[skew_select], tag_entry_v)); 
+            std::cout << "HERE" << std::endl;
             //Umapsptr->node_index->emplace(5, 10);
-            tagPtr = &(c->dynTagPool[c->skew_set_index_arr[skew_select]][0].tag_entry);  
+            tagPtr = (c->dynTagPool[c->skew_set_index_arr[skew_select]][0].tag_entry);  
             c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
+            
         }
     }
 
@@ -280,15 +277,17 @@ void mirage_install (mirageCache *c, Addr addr)
     }
     //Pool check
     //if setID is found
+    
     if (c->dynTagPool.find(c->skew_set_index_arr[skew_select]) != c->dynTagPool.end())
     {
         for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[skew_select]].size(); w++)
         {
-            if (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == skew_select)
+            if ((c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == skew_select) && (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].claimed == true))
             {
-
-                if (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry.valid)
+                if (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry->valid)
+                {
                     extra_pool_valid++;
+                }
                 extra_pool++;
             }
         }
@@ -303,11 +302,13 @@ void mirage_install (mirageCache *c, Addr addr)
 
     if (extra_pool_valid > c->max_extra_pool_valid_used[skew_select][c->skew_set_index_arr[skew_select]])
     {
+        
         c->max_extra_pool_valid_used[skew_select][c->skew_set_index_arr[skew_select]] = extra_pool_valid;
     }
     
     if (extra_pool > c->max_total_extra_pool_used[skew_select][c->skew_set_index_arr[skew_select]])
     {
+        
         c->max_total_extra_pool_used[skew_select][c->skew_set_index_arr[skew_select]] = extra_pool;
     }
 
@@ -320,6 +321,10 @@ void mirage_install (mirageCache *c, Addr addr)
         c->DataStore->entries[evicted_line_index].Data = 0; //Shouldn't matter
         c->DataStore->entries[evicted_line_index].rPtr = tagPtr;
         return;
+    }
+    else
+    {
+        std::cout << "Error!!" << std::endl;
     }
 }
 
@@ -389,7 +394,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         {
             for(uint32_t w=0; w < c->dynTagPool[c->skew_set_index_arr[i]].size(); w++)
             {
-                if ((c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == i) && (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry.valid))
+                if ((c->dynTagPool[c->skew_set_index_arr[skew_select]][w].claimed == true) && (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].skewID == i) && (c->dynTagPool[c->skew_set_index_arr[skew_select]][w].tag_entry->valid))
                     used_tags++;
             }
         }

@@ -66,7 +66,8 @@ typedef struct {
 //dynamic tag pool
 typedef struct dynTagEntry{
   int skewID;
-  tagEntry tag_entry;
+  bool claimed;
+  tagEntry* tag_entry;
 } dynTagEntry;
 
 typedef struct mirageCache{
@@ -101,7 +102,7 @@ typedef struct mirageCache{
   uns64 seed[NUM_SKEW];
 
   //dynamic tag pool
-  std::unordered_map<uns64, std::vector<dynTagEntry> > dynTagPool;
+  std::unordered_map<unsigned long long, std::vector<dynTagEntry> > dynTagPool;
  
 } mirageCache;
 
