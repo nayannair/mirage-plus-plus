@@ -316,7 +316,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         }
         //To randomize skew selection if same num of invalid tags in two skews
         // Only works for 2 skews. Generalize for > 2
-        else if((invalid_tags >= equal_count))
+        if((invalid_tags >= equal_count))
         {
             if (invalid_tags > equal_count)
             {
