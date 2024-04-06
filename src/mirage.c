@@ -134,7 +134,7 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
                 do
                 {
                     rand_index = randomized[i][mtrand->randInt(tag_addr_space - 1)];
-                } while (randomized[i][rand_index] == false);
+                } while (randomized[i][rand_index] == true);
 
                 uint64_t swap_tmp;
                 swap_tmp = hashTable[i][rand_index];
