@@ -125,6 +125,7 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
 
     //Randomize the hashTable
     uint64_t rand_index;
+    
     for(uint64_t i=0; i < NUM_SKEW; i++)
     {
         for(uint64_t j=0; j < tag_addr_space; j++)
@@ -133,7 +134,7 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
             {
                 do
                 {
-                    rand_index = randomized[i][mtrand->randInt(tag_addr_space - 1)];
+                    rand_index = mtrand->randInt(tag_addr_space - 1);
                 } while (randomized[i][rand_index] == true);
 
                 uint64_t swap_tmp;
@@ -153,6 +154,7 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
 
     }    
     printf("Randomized hashTable\n");
+    
     return c;
 }
 
