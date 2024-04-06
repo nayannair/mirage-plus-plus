@@ -39,21 +39,6 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->DataStore->entries = (dataEntry*) calloc(num_entries_data,sizeof(dataEntry));    // sum*assocs = lines
     c->DataStore->num_lines = skews*sets*base_assocs;
 
-    //Instantiating Prince Hash Table
-    for (uns64 i=0; i<NUM_SKEW; i++)
-    {
-        PHT[i] = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
-        PHT[i]->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
-    }
-    
-    for(uns64 i=0; i < TABLE_SIZE; i++)
-    {
-        for (uns64 j=0; j<NUM_SKEW; j++)
-        {
-            PHT[j]->entries[i] = -1;
-        }
-    }  
-
     c->s_count = 0; // number of accesses
     c->s_miss  = 0; // number of misses
     c->s_hits  = 0; // number of hits
@@ -94,6 +79,7 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->DataStore->isFull = FALSE;
 
     hashTable = (uint32_t**)malloc(NUM_SKEW * sizeof(uint32_t*));
+    bool randomized [NUM_SKEW][tag_addr_space];
 
     if (hashTable == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
@@ -123,31 +109,45 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
             //printf("hashTable = %lu\n",hashTable[i][j]);
         }
     }    
-
-    //printf("j & bitMask = %llu\n", 345 & bitMask);
-    printf("Initialized hashTable\n");
-
-    /*for(uint64_t i=0; i < NUM_SKEW; i++)
-    {
-        for(uint64_t j=0; j < tag_addr_space; j++)
-        {
-        }
-    }*/   
-
-    //printf("hashTable[%d][%llu] = %llu\n",0,345,hashTable[0][345]);
-
-
-    //Randomize the hashTable
+    printf("Initialization start - hashTable\n");
+    //Initialization
     for(uint64_t i=0; i < NUM_SKEW; i++)
     {
         for(uint64_t j=0; j < tag_addr_space; j++)
         {
-            uint64_t rand_idx_0 = mtrand->randInt(tag_addr_space - 1);
-            uint64_t rand_idx_1 = mtrand->randInt(tag_addr_space - 1);
-            uint64_t swap_tmp;
-            swap_tmp = hashTable[i][rand_idx_0];
-            hashTable[i][rand_idx_0] = hashTable[i][rand_idx_1];
-            hashTable[i][rand_idx_1] = swap_tmp & bitMask;
+            randomized[i][j] = false;
+        }
+    }
+
+    //printf("j & bitMask = %llu\n", 345 & bitMask);
+    printf("Initialized hashTable\n");
+
+
+    //Randomize the hashTable
+    uint64_t rand_index;
+    for(uint64_t i=0; i < NUM_SKEW; i++)
+    {
+        for(uint64_t j=0; j < tag_addr_space; j++)
+        {
+            if (randomized[i][j] == false)
+            {
+                do
+                {
+                    rand_index = randomized[i][mtrand->randInt(tag_addr_space - 1)];
+                } while (randomized[i][rand_index] == false);
+
+                uint64_t swap_tmp;
+                swap_tmp = hashTable[i][rand_index];
+                hashTable[i][rand_index] = hashTable[i][j];
+                hashTable[i][j] = swap_tmp & bitMask;
+                
+                randomized[i][rand_index] = true;
+                randomized[i][j] = true;
+            }
+            else
+            {
+                continue;
+            }
         }
         //printf("skew = %d\n",i);
 
