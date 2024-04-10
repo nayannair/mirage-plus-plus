@@ -34,6 +34,24 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->DataStore->entries = (dataEntry*) calloc(num_entries_data,sizeof(dataEntry));    // sum*assocs = lines
     c->DataStore->num_lines = skews*sets*base_assocs;
 
+    //Shared TagStore
+    c->SharedTagStore = (tagStore*) calloc(1,sizeof(tagStore));
+    c->SharedTagStore->shared_assocs = SHARED_WAYS;
+    c->SharedTagStore->sets = sets;
+    c->SharedTagStore->skews = 1;
+    uint64_t num_entries_in_sh_tagstr = sets*SHARED_WAYS;
+    c->SharedTagStore->entries = (tagEntry*) calloc(num_entries_in_sh_tagstr,sizeof(tagEntry));
+    printf("num shared tag %d\n",num_entries_in_sh_tagstr);
+
+    for(uint64_t i=0; i<num_entries_in_sh_tagstr; i++)
+    {
+        c->SharedTagStore->entries[i].skewID =-1;
+        c->SharedTagStore->entries[i].full_tag = 0;
+        c->SharedTagStore->entries[i].fPtr = NULL;
+        c->SharedTagStore->entries[i].valid = 0;
+        c->SharedTagStore->entries[i].dirty = 0;
+    }
+
     //Instantiating Prince Hash Table
     for (uns64 i=0; i<NUM_SKEW; i++)
     {
@@ -139,6 +157,21 @@ Flag mirage_access (mirageCache *c, Addr addr)
                 return HIT;
             }
         }
+
+        //shared tag store access
+        for(int j=0; j < c->SharedTagStore->shared_assocs;j++)
+        {
+            uns64 llc_index = (c->skew_set_index_arr[i]*SHARED_WAYS)+j;
+            if((c->SharedTagStore->entries[llc_index].valid) && (incoming_tag == c->SharedTagStore->entries[llc_index].full_tag ) && (c->SharedTagStore->entries[llc_index].skewID==i))
+            {
+                //Line Found in Tag Store
+                //printf("Line Found in Cache at entry! at SKEW: %lu, SET: %lu, Way: %lu\n",i,skew_set_index,j);
+                c->s_hits++;
+                c->m_hits[i][c->skew_set_index_arr[i]]++;
+                return HIT;
+            }
+        }
+
         c->m_miss[i][c->skew_set_index_arr[i]]++;
 
     }
@@ -173,7 +206,7 @@ void mirage_install (mirageCache *c, Addr addr)
         uns64 llc_index = skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select;
         c->TagStore->entries[llc_index].full_tag = addr;
         c->TagStore->entries[llc_index].dirty = FALSE; 
-        c->TagStore->entries[llc_index].valid = TRUE;
+        c->TagStore->entries[llc_index].valid = TRUE;  
         //c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].fPtr->Data = 0;   //Use incoming data if needed
         return;
     }
@@ -201,6 +234,7 @@ void mirage_install (mirageCache *c, Addr addr)
 
     //Install Line
     tagEntry* tagPtr = NULL;
+    int installed_in_base = 0;
     //Tag Store
     for (int i =0 ; i < c->TagStore->total_assocs_per_skew ; i++)
     {
@@ -214,8 +248,32 @@ void mirage_install (mirageCache *c, Addr addr)
             c->TagStore->entries[llc_index].full_tag = addr;
             tagPtr = &(c->TagStore->entries[llc_index]);
             c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
+            installed_in_base = 1;
             //printf("Skew %lu, set %lu has %lu installs\n",skew_select,skew_set_index,c->s_distribution[skew_select][skew_set_index]);
             break;
+        }
+    }
+
+    //Install in shared tag
+    if(!installed_in_base)
+    {
+        for (int i =0 ; i < c->SharedTagStore->shared_assocs ; i++)
+        {
+            uns64 llc_index = c->skew_set_index_arr[skew_select]*SHARED_WAYS+i;
+            if(!c->SharedTagStore->entries[llc_index].valid)
+            {
+                //printf("installing in Tag Store: %lu\n",skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i);
+
+                c->SharedTagStore->entries[llc_index].fPtr = &(c->DataStore->entries[evicted_line_index]);
+                c->SharedTagStore->entries[llc_index].valid = TRUE;
+                c->SharedTagStore->entries[llc_index].skewID = skew_select;
+                c->SharedTagStore->entries[llc_index].full_tag = addr;
+                tagPtr = &(c->SharedTagStore->entries[llc_index]);
+                c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
+                //printf("Skew %lu, set %lu has %lu installs\n",skew_select,skew_set_index,c->s_distribution[skew_select][skew_set_index]);
+                break;
+                
+            }
         }
     }
 
@@ -272,6 +330,7 @@ uns64 mirageGLE(mirageCache *c)
     c->DataStore->entries[line_to_evict].rPtr->valid = FALSE;
     c->DataStore->entries[line_to_evict].rPtr->fPtr = NULL;
     c->DataStore->entries[line_to_evict].rPtr->dirty = 0;
+    c->DataStore->entries[line_to_evict].rPtr->skewID = -1;
     c->DataStore->entries[line_to_evict].rPtr = NULL;
 
     return line_to_evict;
@@ -304,6 +363,15 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         {
             uns64 llc_index = i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j;
             if(!(c->TagStore->entries[llc_index].valid))
+            {
+                invalid_tags++;
+            }
+        }
+
+        for(int j =0; j < c->SharedTagStore->shared_assocs ; j++)
+        {
+            uns64 llc_index = c->skew_set_index_arr[i]*SHARED_WAYS+j;
+            if(!(c->SharedTagStore->entries[llc_index].valid))
             {
                 invalid_tags++;
             }
@@ -404,6 +472,7 @@ void mirage_print_stats(mirageCache *c, char *header)
     for(uint64_t j=0 ; j < NUM_SKEW; j++)
     {
         uint64_t ways_used = 0;
+        uint64_t shared_ways_used = 0;
         for(uint64_t k=0; k < c->TagStore->total_assocs_per_skew; k++)
         {
             if(c->TagStore->entries[j*SKEW_SIZE+i*SET_SIZE+k].valid)
@@ -411,8 +480,20 @@ void mirage_print_stats(mirageCache *c, char *header)
                 ways_used++;
             }
         }
+        
         printf("%lu \t\t",ways_used);
+
+        for(uint64_t k=0; k < c->SharedTagStore->shared_assocs; k++)
+        {
+            if(c->SharedTagStore->entries[i*SHARED_WAYS+k].valid && c->SharedTagStore->entries[i*SHARED_WAYS+k].skewID == j)
+            {
+                shared_ways_used++;
+            }
+        }  
+        printf("%lu \t\t",shared_ways_used);
     }
+
+    
     //Max ways used
     for(uint64_t j=0 ; j < NUM_SKEW; j++)
     {
