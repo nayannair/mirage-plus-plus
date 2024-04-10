@@ -39,6 +39,37 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->DataStore->entries = (dataEntry*) calloc(num_entries_data,sizeof(dataEntry));    // sum*assocs = lines
     c->DataStore->num_lines = skews*sets*base_assocs;
 
+    //Shared TagStore
+    c->SharedTagStore = (tagStore*) calloc(1,sizeof(tagStore));
+    c->SharedTagStore->shared_assocs = SHARED_WAYS;
+    c->SharedTagStore->sets = sets;
+    c->SharedTagStore->skews = 1;
+    uint64_t num_entries_in_sh_tagstr = sets*SHARED_WAYS;
+    c->SharedTagStore->entries = (tagEntry*) calloc(num_entries_in_sh_tagstr,sizeof(tagEntry));
+    printf("num shared tag %d\n",num_entries_in_sh_tagstr);
+    for(uint64_t i=0; i<num_entries_in_sh_tagstr; i++)
+    {
+        c->SharedTagStore->entries[i].skewID =-1;
+        c->SharedTagStore->entries[i].full_tag = 0;
+        c->SharedTagStore->entries[i].fPtr = NULL;
+        c->SharedTagStore->entries[i].valid = 0;
+        c->SharedTagStore->entries[i].dirty = 0;
+    }
+    //Instantiating Prince Hash Table
+    for (uns64 i=0; i<NUM_SKEW; i++)
+    {
+        PHT[i] = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
+        PHT[i]->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
+    }
+    
+    for(uns64 i=0; i < TABLE_SIZE; i++)
+    {
+        for (uns64 j=0; j<NUM_SKEW; j++)
+        {
+            PHT[j]->entries[i] = -1;
+        }
+    }
+
     c->s_count = 0; // number of accesses
     c->s_miss  = 0; // number of misses
     c->s_hits  = 0; // number of hits
@@ -165,17 +196,15 @@ Flag mirage_access (mirageCache *c, Addr addr)
     // Access skews in parallel
     for(int i =0 ; i<c->TagStore->skews; i++)
     {
-        
         c->skew_set_index_arr[i] = mirage_hash(c->seed[i],addr,i);
         //assert (skew_set_index == c->princeHashTable0[addr]);
         //assert (skew_set_index == c->princeHashTable1[addr]);
-
 
         Addr incoming_tag = addr; //Full 40-bit tag
 
         //printf("checking entry: SKEW %lu, SET Index: %lu\n",i,c->skew_set_index_arr[i]);
         c->m_access[i][c->skew_set_index_arr[i]]++;
-
+        
         for(int j =0; j< c->TagStore->total_assocs_per_skew; j++)
         {
             //printf("Comparing LineAddr:%llu with Full-Tag %llu\n",addr,c->TagStore->entries[i*SKEW_SIZE+c->skew_set_index_arr[i]*SET_SIZE+j].full_tag);
@@ -189,7 +218,6 @@ Flag mirage_access (mirageCache *c, Addr addr)
                 return HIT;
             }
         }
-
         //shared tag store access
         for(int j=0; j < c->SharedTagStore->shared_assocs;j++)
         {
@@ -203,8 +231,9 @@ Flag mirage_access (mirageCache *c, Addr addr)
                 return HIT;
             }
         }
-
+        
         c->m_miss[i][c->skew_set_index_arr[i]]++;
+        
 
     }
     //printf("Line is a miss in LLC!\n");
