@@ -31,6 +31,7 @@
 #define NUM_SETS 16384
 #define SKEW_SIZE NUM_SETS*(NUM_ASSOCS+EXTRA_WAYS)
 #define SET_SIZE (NUM_ASSOCS+EXTRA_WAYS)
+#define TOTAL_LINES_IN_MEM MEM_SIZE_MB*1024*1024/LINESIZE
 /* Renames -- Try to use these rather than built-in C types for portability */
 
 

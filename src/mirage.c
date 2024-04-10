@@ -7,6 +7,11 @@
 
 std::vector<PrinceHashTable*> PHT (NUM_SKEW);
 
+//16384*1024*1024/LINESIZE
+uint32_t tag_addr_space = 1 << 14; //40-bit tag 
+
+uint32_t** hashTable; 
+
 MTRand *mtrand=new MTRand(42);
 
 mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
@@ -34,6 +39,7 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->DataStore->entries = (dataEntry*) calloc(num_entries_data,sizeof(dataEntry));    // sum*assocs = lines
     c->DataStore->num_lines = skews*sets*base_assocs;
 
+<<<<<<< HEAD
     //Shared TagStore
     c->SharedTagStore = (tagStore*) calloc(1,sizeof(tagStore));
     c->SharedTagStore->shared_assocs = SHARED_WAYS;
@@ -67,6 +73,8 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
         }
     }  
 
+=======
+>>>>>>> origin/master
     c->s_count = 0; // number of accesses
     c->s_miss  = 0; // number of misses
     c->s_hits  = 0; // number of hits
@@ -106,23 +114,83 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
 
     c->DataStore->isFull = FALSE;
 
-    /*
-    c->princeHashTable0 = (Addr*) calloc(NUM_LINES_IN_MEM,sizeof(Addr));
-    c->princeHashTable1 = (Addr*) calloc(NUM_LINES_IN_MEM,sizeof(Addr));
+    hashTable = (uint32_t**)malloc(NUM_SKEW * sizeof(uint32_t*));
+    bool randomized [NUM_SKEW][tag_addr_space];
 
-    //Initilize hash table
-    
-    for(int j =0; j < MEM_SIZE_MB*1024*1024/LINESIZE; j++)
-    {
-        c->princeHashTable0[j] = calcPRINCE64(j, rand()) % NUM_SETS;
+    if (hashTable == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
     }
 
-    for(int j =0; j < MEM_SIZE_MB*1024*1024/LINESIZE; j++)
+    for(int i =0; i < NUM_SKEW ; i++)
     {
-        c->princeHashTable1[j] = calcPRINCE64(j, rand()) % NUM_SETS;
-    }*/
-    
+        hashTable[i] = (uint32_t*)malloc(tag_addr_space * sizeof(uint32_t));
+        if (hashTable[i] == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
 
+            // Free the memory allocated for previous rows
+            for (int j = 0; j < i; j++) {
+                free(hashTable[j]);
+            }
+            free(hashTable);
+        }
+    }
+
+    //Initialize the hash Table
+    uint64_t bitMask = (1 << 14) - 1;
+    for(uint64_t i=0; i < NUM_SKEW; i++)
+    {
+        for(uint64_t j=0; j < tag_addr_space; j++)
+        {
+            hashTable[i][j] = j & bitMask;
+            //printf("hashTable = %lu\n",hashTable[i][j]);
+        }
+    }    
+    printf("Initialization start - hashTable\n");
+    //Initialization
+    for(uint64_t i=0; i < NUM_SKEW; i++)
+    {
+        for(uint64_t j=0; j < tag_addr_space; j++)
+        {
+            randomized[i][j] = false;
+        }
+    }
+
+    //printf("j & bitMask = %llu\n", 345 & bitMask);
+    printf("Initialized hashTable\n");
+
+
+    //Randomize the hashTable
+    uint64_t rand_index;
+    
+    for(uint64_t i=0; i < NUM_SKEW; i++)
+    {
+        for(uint64_t j=0; j < tag_addr_space; j++)
+        {
+            if (randomized[i][j] == false)
+            {
+                do
+                {
+                    rand_index = mtrand->randInt(tag_addr_space - 1);
+                } while (randomized[i][rand_index] == true);
+
+                uint64_t swap_tmp;
+                swap_tmp = hashTable[i][rand_index];
+                hashTable[i][rand_index] = hashTable[i][j];
+                hashTable[i][j] = swap_tmp & bitMask;
+                
+                randomized[i][rand_index] = true;
+                randomized[i][j] = true;
+            }
+            else
+            {
+                continue;
+            }
+        }
+        //printf("skew = %d\n",i);
+
+    }    
+    printf("Randomized hashTable\n");
+    
     return c;
 }
 
@@ -189,6 +257,7 @@ void mirage_install (mirageCache *c, Addr addr)
 
     Addr skew_set_index;
     uns skew_select = skewSelect(c,addr, &tagSAE);
+    //printf("Chose skew %d\n",skew_select);
     
     //Check if tagStore has SAE
     if(tagSAE)
@@ -394,8 +463,14 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
             equal_count = invalid_tags;
             //skew_select = mtrand->randInt(equals.size() - 1) % (equals.size());
             //assert (skew_select < equals.size());
+            //printf("equals.size() = %d\n",equals.size());
             skew_select_equals = equals[mtrand->randInt(equals.size() - 1) % (equals.size())];
+            //printf("skew_select_equals = %d\n",skew_select_equals);
+
         }
+
+        //printf("Skew %d -> %u invalid tags\n", i, invalid_tags);
+        //printf("Max invalid tags -> %u\n", max_invalid_tags);
     }
     
     //assert (max_invalid_tags != 0);
@@ -428,26 +503,10 @@ Addr mirage_hash(uns seed, Addr addr, int skew)
     //return addr % NUM_SETS;
     //PRINCE Cipher with random number as the seed
    Addr hashed_addr;
-   Addr l_addr_bits = addr & 0xFFFFFFFFFF;
-   //printf("Addr accessed in Hash Table! Addr: %llu\n",addr);
+   Addr l_addr_bits = (addr & 0x3FFF) ;
 
-   PrinceHashTable* PHT_c = PHT[skew];
-
-   if(PHT_c->entries[l_addr_bits] != -1)
-   {
-	//printf("Addr Exists in Hash Table! Addr: %llu\n",addr);
-	hashed_addr = PHT_c->entries[l_addr_bits];
-	//printf("Addr Exists in Hash Table! Addr: %llu\n",addr);
-   }
-   else
-   {
-        //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
-	PHT_c->entries[l_addr_bits] = calcPRINCE64(addr, seed) % NUM_SETS;
-	hashed_addr = PHT_c->entries[l_addr_bits];
-        //printf("Addr Inserted in Hash Table! Addr: %llu\n",addr);
-
-   }
-   //hashed_addr = calcPRINCE64(addr, seed) % NUM_SETS;
+   hashed_addr = hashTable[skew][l_addr_bits];
+   //printf("hashed_addr = %llu, input addr = %llu\n",hashed_addr,l_addr_bits);   
    return hashed_addr;
     
 }
