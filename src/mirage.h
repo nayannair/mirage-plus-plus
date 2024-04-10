@@ -25,6 +25,10 @@ typedef struct tagEntry
     // Dirty 
     uns dirty;
 
+    //Only for shared tag
+    int skewID;
+
+
 } tagEntry;
 
 typedef struct dataEntry
@@ -43,6 +47,9 @@ typedef struct tagStore{
   uns skews;
   uns extra_assocs;
   uns total_assocs_per_skew;
+
+  //Only for shared tag
+  uns shared_assocs;
 
   //Entry
   tagEntry* entries;
@@ -64,6 +71,7 @@ typedef struct mirageCache{
   
   tagStore* TagStore;
   dataStore* DataStore;
+  tagStore* SharedTagStore;
 
   //Hash table for PRINCE cipher for all lineaddr in mem
   Addr* princeHashTable0;
