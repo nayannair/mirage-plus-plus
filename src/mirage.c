@@ -39,42 +39,6 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     c->DataStore->entries = (dataEntry*) calloc(num_entries_data,sizeof(dataEntry));    // sum*assocs = lines
     c->DataStore->num_lines = skews*sets*base_assocs;
 
-<<<<<<< HEAD
-    //Shared TagStore
-    c->SharedTagStore = (tagStore*) calloc(1,sizeof(tagStore));
-    c->SharedTagStore->shared_assocs = SHARED_WAYS;
-    c->SharedTagStore->sets = sets;
-    c->SharedTagStore->skews = 1;
-    uint64_t num_entries_in_sh_tagstr = sets*SHARED_WAYS;
-    c->SharedTagStore->entries = (tagEntry*) calloc(num_entries_in_sh_tagstr,sizeof(tagEntry));
-    printf("num shared tag %d\n",num_entries_in_sh_tagstr);
-
-    for(uint64_t i=0; i<num_entries_in_sh_tagstr; i++)
-    {
-        c->SharedTagStore->entries[i].skewID =-1;
-        c->SharedTagStore->entries[i].full_tag = 0;
-        c->SharedTagStore->entries[i].fPtr = NULL;
-        c->SharedTagStore->entries[i].valid = 0;
-        c->SharedTagStore->entries[i].dirty = 0;
-    }
-
-    //Instantiating Prince Hash Table
-    for (uns64 i=0; i<NUM_SKEW; i++)
-    {
-        PHT[i] = (PrinceHashTable*)malloc(sizeof(PrinceHashTable));
-        PHT[i]->entries = (uint64_t*)calloc(TABLE_SIZE,sizeof(uint64_t));
-    }
-    
-    for(uns64 i=0; i < TABLE_SIZE; i++)
-    {
-        for (uns64 j=0; j<NUM_SKEW; j++)
-        {
-            PHT[j]->entries[i] = -1;
-        }
-    }  
-
-=======
->>>>>>> origin/master
     c->s_count = 0; // number of accesses
     c->s_miss  = 0; // number of misses
     c->s_hits  = 0; // number of hits
