@@ -14,6 +14,9 @@ all:  folders traces
 folders: 
 	mkdir -p ../RESULTS
 
+debug:
+	${CC} ${CFLAGS} ${DFLAGS} dram.c  mgries.c cra_ctr.c ctrcache.c scoreboard.c mcore.c os.c  mcache.c sim.c memsys.c  hash_lib.c malloc_lib.c hydra.c mirage.c prince.c -o ${SIM}
+
 traces: 
 	if test -d ../TRACES; then echo "Traces exist" ; else echo "Downloading traces..." ; wget -O traces.tar.gz "https://www.dropbox.com/s/77pgznatvbr9hw9/traces.tar.gz?dl=1" ; mv traces.tar.gz ../. ;  cd ../ ; tar -zxvf traces.tar.gz ; rm -rf traces.tar.gz; fi
 

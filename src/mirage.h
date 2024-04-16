@@ -67,6 +67,7 @@ typedef struct {
     uint64_t* entries;
 } PrinceHashTable;
 
+
 typedef struct mirageCache{
   
   tagStore* TagStore;
@@ -92,6 +93,7 @@ typedef struct mirageCache{
   uns64 m_access[NUM_SKEW][NUM_SETS];
   uns64 m_gle;
   uns64 m_sae;
+  uns64 m_codi_relocs;
   uns64 max_ways_used[NUM_SKEW][NUM_SETS];
 
   //seed for hash function per skew
@@ -113,10 +115,11 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE);
 //Global eviction
 uns64 mirageGLE(mirageCache *c);
 
+//Codi Functions
+void codiReloc(mirageCache* c, Addr codi_victim_idx, uns skew_select);
+Addr codiVictim(mirageCache* c, uns skew_select, uns set_select, uns* skew);
+int checkInvalidTags(mirageCache* c, uns skew, Addr reloc_addr);
+
 void mirage_print_stats(mirageCache *c, char *header);
-
-
-
-
 
 #endif //MIRAGE_H
