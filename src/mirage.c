@@ -5,7 +5,6 @@
 // Power of 2 choices --> random skew selection only works for 2 skews. Generalize for > 2
 // implement write/read functionality and dirty writebacks
 
-std::vector<PrinceHashTable*> PHT (NUM_SKEW);
 
 MTRand *mtrand=new MTRand(42);
 
@@ -37,15 +36,15 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
     //Shared TagStore
     c->SharedTagStore = (tagStore*) calloc(1,sizeof(tagStore));
     c->SharedTagStore->shared_assocs = SHARED_WAYS;
-    c->SharedTagStore->sets = sets;
-    c->SharedTagStore->skews = 1;
-    uint64_t num_entries_in_sh_tagstr = sets*SHARED_WAYS;
+    c->SharedTagStore->sets = sets/2;   //Two sets in a skew share extra tags
+    c->SharedTagStore->skews = 2;
+    uint64_t num_entries_in_sh_tagstr = c->SharedTagStore->sets * SHARED_WAYS * c->SharedTagStore->skews;
     c->SharedTagStore->entries = (tagEntry*) calloc(num_entries_in_sh_tagstr,sizeof(tagEntry));
     printf("num shared tag %d\n",num_entries_in_sh_tagstr);
 
     for(uint64_t i=0; i<num_entries_in_sh_tagstr; i++)
     {
-        c->SharedTagStore->entries[i].skewID =-1;
+        c->SharedTagStore->entries[i].setID =-1;
         c->SharedTagStore->entries[i].full_tag = 0;
         c->SharedTagStore->entries[i].fPtr = NULL;
         c->SharedTagStore->entries[i].valid = 0;
@@ -106,22 +105,9 @@ mirageCache *mirage_new(uns sets, uns base_assocs, uns skews )
 
     c->DataStore->isFull = FALSE;
 
-    /*
+    
     c->princeHashTable0 = (Addr*) calloc(NUM_LINES_IN_MEM,sizeof(Addr));
     c->princeHashTable1 = (Addr*) calloc(NUM_LINES_IN_MEM,sizeof(Addr));
-
-    //Initilize hash table
-    
-    for(int j =0; j < MEM_SIZE_MB*1024*1024/LINESIZE; j++)
-    {
-        c->princeHashTable0[j] = calcPRINCE64(j, rand()) % NUM_SETS;
-    }
-
-    for(int j =0; j < MEM_SIZE_MB*1024*1024/LINESIZE; j++)
-    {
-        c->princeHashTable1[j] = calcPRINCE64(j, rand()) % NUM_SETS;
-    }*/
-    
 
     return c;
 }
@@ -135,8 +121,6 @@ Flag mirage_access (mirageCache *c, Addr addr)
     {
         
         c->skew_set_index_arr[i] = mirage_hash(c->seed[i],addr,i);
-        //assert (skew_set_index == c->princeHashTable0[addr]);
-        //assert (skew_set_index == c->princeHashTable1[addr]);
 
 
         Addr incoming_tag = addr; //Full 40-bit tag
@@ -159,10 +143,12 @@ Flag mirage_access (mirageCache *c, Addr addr)
         }
 
         //shared tag store access
+        Addr shared_tag_index = c->skew_set_index_arr[i]/2;
+        int shared_tag_set_id = c->skew_set_index_arr[i]%2;
         for(int j=0; j < c->SharedTagStore->shared_assocs;j++)
         {
-            uns64 llc_index = (c->skew_set_index_arr[i]*SHARED_WAYS)+j;
-            if((c->SharedTagStore->entries[llc_index].valid) && (incoming_tag == c->SharedTagStore->entries[llc_index].full_tag ) && (c->SharedTagStore->entries[llc_index].skewID==i))
+            uns64 llc_index = (SHARED_WAYS*(NUM_SETS/2)*i) + (shared_tag_index*SHARED_WAYS)+j;
+            if((c->SharedTagStore->entries[llc_index].valid) && (c->SharedTagStore->entries[llc_index].setID==shared_tag_set_id) && (incoming_tag == c->SharedTagStore->entries[llc_index].full_tag ))
             {
                 //Line Found in Tag Store
                 //printf("Line Found in Cache at entry! at SKEW: %lu, SET: %lu, Way: %lu\n",i,skew_set_index,j);
@@ -171,7 +157,6 @@ Flag mirage_access (mirageCache *c, Addr addr)
                 return HIT;
             }
         }
-
         c->m_miss[i][c->skew_set_index_arr[i]]++;
 
     }
@@ -193,16 +178,14 @@ void mirage_install (mirageCache *c, Addr addr)
     //Check if tagStore has SAE
     if(tagSAE)
     {
+
+        //FIX THIS
+
         //Invalidate from Tag Store and evict corresponding Data Store entry and replace with new line
         uns way_select = rand() % c->TagStore->total_assocs_per_skew;   //Can possibly implement some kind of replacement policy here
         //uns set_select = mirage_hash(skew_select,addr);
         uns set_select = c->skew_set_index_arr[skew_select]; //Only works for 2 skews. 
 
-        //Writeback if dirty
-        //if (c->TagStore->entries[skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select].dirty)
-        //{
-        //    printf("Writeback!\n");
-        //}
         uns64 llc_index = skew_select*SKEW_SIZE + set_select*SET_SIZE + way_select;
         c->TagStore->entries[llc_index].full_tag = addr;
         c->TagStore->entries[llc_index].dirty = FALSE; 
@@ -254,19 +237,22 @@ void mirage_install (mirageCache *c, Addr addr)
         }
     }
 
+    Addr shared_tag_index = c->skew_set_index_arr[skew_select]/2;
+    int shared_tag_set_id = c->skew_set_index_arr[skew_select]%2;
+    
     //Install in shared tag
     if(!installed_in_base)
     {
         for (int i =0 ; i < c->SharedTagStore->shared_assocs ; i++)
         {
-            uns64 llc_index = c->skew_set_index_arr[skew_select]*SHARED_WAYS+i;
+            uns64 llc_index = skew_select*SHARED_WAYS*(NUM_SETS/2) +shared_tag_index*SHARED_WAYS+i;
             if(!c->SharedTagStore->entries[llc_index].valid)
             {
                 //printf("installing in Tag Store: %lu\n",skew_select*SKEW_SIZE + skew_set_index*SET_SIZE+i);
 
                 c->SharedTagStore->entries[llc_index].fPtr = &(c->DataStore->entries[evicted_line_index]);
                 c->SharedTagStore->entries[llc_index].valid = TRUE;
-                c->SharedTagStore->entries[llc_index].skewID = skew_select;
+                c->SharedTagStore->entries[llc_index].setID = shared_tag_set_id;
                 c->SharedTagStore->entries[llc_index].full_tag = addr;
                 tagPtr = &(c->SharedTagStore->entries[llc_index]);
                 c->m_installs[skew_select][c->skew_set_index_arr[skew_select]]++;
@@ -316,8 +302,7 @@ uns64 mirageGLE(mirageCache *c)
     //printf("Random Global Eviction\n");
     //Choose a line from data store randomly for eviction
     uns64 line_to_evict = mtrand->randInt(c->DataStore->num_lines - 1) % (c->DataStore->num_lines);//rand() % c->DataStore->num_lines;
-    //uns64 line_to_evict = mtrand->randInt(c->DataStore->num_lines - 1);
-    //assert (line_to_evict < c->DataStore->num_lines);
+    
     //Writeback if dirty
     if (c->DataStore->entries[line_to_evict].rPtr->dirty)
     {
@@ -330,7 +315,7 @@ uns64 mirageGLE(mirageCache *c)
     c->DataStore->entries[line_to_evict].rPtr->valid = FALSE;
     c->DataStore->entries[line_to_evict].rPtr->fPtr = NULL;
     c->DataStore->entries[line_to_evict].rPtr->dirty = 0;
-    c->DataStore->entries[line_to_evict].rPtr->skewID = -1;
+    c->DataStore->entries[line_to_evict].rPtr->setID = -1;
     c->DataStore->entries[line_to_evict].rPtr = NULL;
 
     return line_to_evict;
@@ -358,6 +343,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
 
         //printf("checking entry %lu\n",i*SKEW_SIZE+skew_set_index*SET_SIZE);
 
+        
         //Check for invalid tags
         for(int j =0; j < c->TagStore->total_assocs_per_skew ; j++)
         {
@@ -368,9 +354,10 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
             }
         }
 
+        Addr shared_tag_index = c->skew_set_index_arr[i]/2;
         for(int j =0; j < c->SharedTagStore->shared_assocs ; j++)
         {
-            uns64 llc_index = c->skew_set_index_arr[i]*SHARED_WAYS+j;
+            uns64 llc_index = i*SHARED_WAYS*(NUM_SETS/2) + shared_tag_index*SHARED_WAYS+j;
             if(!(c->SharedTagStore->entries[llc_index].valid))
             {
                 invalid_tags++;
@@ -406,7 +393,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
         *tagSAE = TRUE;
         c->m_sae++;
         //Select skew on random
-        uns skew_rand = rand() % c->TagStore->skews;
+        uns skew_rand = mtrand->randInt(c->TagStore->skews-1);
         //*skew_set_index = c->skew_set_index_arr[skew_rand];
         return ( skew_rand );
     }
@@ -485,7 +472,7 @@ void mirage_print_stats(mirageCache *c, char *header)
 
         for(uint64_t k=0; k < c->SharedTagStore->shared_assocs; k++)
         {
-            if(c->SharedTagStore->entries[i*SHARED_WAYS+k].valid && c->SharedTagStore->entries[i*SHARED_WAYS+k].skewID == j)
+            if(c->SharedTagStore->entries[j*SHARED_WAYS*(NUM_SETS/2) +(i/2)*SHARED_WAYS+k].valid && c->SharedTagStore->entries[j*SHARED_WAYS*(NUM_SETS/2) +(i/2)*SHARED_WAYS+k].setID == (i%2))
             {
                 shared_ways_used++;
             }
@@ -493,7 +480,6 @@ void mirage_print_stats(mirageCache *c, char *header)
         printf("%lu \t\t",shared_ways_used);
     }
 
-    
     //Max ways used
     for(uint64_t j=0 ; j < NUM_SKEW; j++)
     {
