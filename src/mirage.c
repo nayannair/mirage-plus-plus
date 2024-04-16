@@ -5,6 +5,7 @@
 // Power of 2 choices --> random skew selection only works for 2 skews. Generalize for > 2
 // implement write/read functionality and dirty writebacks
 
+std::vector<PrinceHashTable*> PHT (NUM_SKEW);
 
 MTRand *mtrand=new MTRand(42);
 

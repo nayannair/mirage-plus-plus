@@ -63,6 +63,11 @@ typedef struct dataStore{
   dataEntry* entries;
 } dataStore;
 
+typedef struct {
+    uint64_t* entries;
+} PrinceHashTable;
+
+
 typedef struct mirageCache{
   
   tagStore* TagStore;
