@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <iostream>
 
 #include "mtrand.h"
 
@@ -60,6 +61,7 @@ typedef unsigned long long uns64;
 typedef double dbl;
 
 
+
 /////////////////////////////////////////////////////
 // EXPERIMENT VARIABLES
 /////////////////////////////////////////////////////
@@ -67,7 +69,14 @@ typedef double dbl;
 //For each Bucket (Set), number of Balls in Bucket
 //(Data-Structure Similar to Tag-Store)
 uns64 bucket[NUM_BUCKETS];
-uns64 bucket[NUM_BUCKETS/2];
+
+typedef struct extra_buckets_struct {
+    uns64 balls_0;
+    uns64 balls_1;
+} extra_buckets_struct;
+
+extra_buckets_struct extra_buckets [NUM_BUCKETS_PER_SKEW];
+
 
 //For each Ball (Cache-Line), which Bucket (Set) it is in
 //(Data-Structure Similar to Data-Store RPTR)
@@ -102,25 +111,69 @@ MTRand *mtrand=new MTRand();
 void spill_ball(uns64 index, uns64 ballID){
   uns done=0;
 
-  bucket[index]--;
+  assert (bucket[index]           == BASE_WAYS_PER_SKEW);
+  if (index >= NUM_BUCKETS_PER_SKEW)
+    assert ((extra_buckets[index - NUM_BUCKETS_PER_SKEW].balls_1 + extra_buckets[index-NUM_BUCKETS_PER_SKEW].balls_0) == EXTRA_BUCKET_CAPACITY+1);
+  else
+    assert ((extra_buckets[index].balls_1 + extra_buckets[index].balls_0) == EXTRA_BUCKET_CAPACITY+1);
 
+  //TODO - fix this [add condition to check if ball corresponding to index is present in the extra bucket, evict it]
+  //bucket[index]--;
+  if (index >= NUM_BUCKETS_PER_SKEW)
+  {
+    if (extra_buckets[index - NUM_BUCKETS_PER_SKEW].balls_1 > 0)
+      extra_buckets[index - NUM_BUCKETS_PER_SKEW].balls_1--;
+    else
+      bucket[index]--;
+  }
+  else
+  {
+    if (extra_buckets[index].balls_0 > 0)
+      extra_buckets[index].balls_0--;
+    else
+      bucket[index]--;
+  }
+    
   while(done!=1){
     //Pick skew & bucket-index where spilled ball should be placed.
     uns64 spill_index ;
     //If current index is in Skew0, then pick Skew1. Else vice-versa.
+    uns64 balls_at_spill_index;
     if(index < NUM_BUCKETS_PER_SKEW)
+    {
       spill_index = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
+      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index].balls_0 + extra_buckets[spill_index].balls_1;
+    } 
     else
+    {
       spill_index = mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-
+      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1;
+    }
+      
     //If new spill_index bucket where spilled-ball is to be installed has space, then done.
-    if(bucket[spill_index] < SPILL_THRESHOLD){
+    if(balls_at_spill_index < SPILL_THRESHOLD){
       done=1;
-      bucket[spill_index]++;
+      
+      if (bucket[spill_index] < BASE_WAYS_PER_SKEW)
+        bucket[spill_index]++;
+      else
+      {
+        if (spill_index >= NUM_BUCKETS_PER_SKEW)
+          extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1++;
+        else
+          extra_buckets[spill_index].balls_0++;
+      }
       balls[ballID] = spill_index;
      
     } else {
-      assert(bucket[spill_index] == SPILL_THRESHOLD);
+      /*
+      if (balls_at_spill_index != SPILL_THRESHOLD)
+      {
+        std::cout << "balls_at_spill_index = " << balls_at_spill_index << std::endl;
+        std::cout << "SPILL_THRESHOLD = " << SPILL_THRESHOLD << std::endl;
+      }
+      */
+      assert(balls_at_spill_index == SPILL_THRESHOLD);
       //if bucket of spill_index is also full, then recursive-spill, we call this a cuckoo-spill
       index = spill_index;
       cuckoo_spill_count++;
@@ -142,10 +195,14 @@ uns insert_ball(uns64 ballID){
   //Index for Rand Bucket in Skew-1
   uns64 index2 = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW - 1);
 
+  //Calculating the balls in bucket+extra_bucket
+  uns64 balls_index1 = bucket[index1]+extra_buckets[index1].balls_0 + extra_buckets[index1].balls_1;
+  uns64 balls_index2 = bucket[index2]+extra_buckets[index2-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[index2-NUM_BUCKETS_PER_SKEW].balls_1;
+  
   //Increments Tracking of Indexed Buckets
   if(init_buckets_done){
-    bucket_fill_observed[bucket[index1]]++;
-    bucket_fill_observed[bucket[index2]]++;
+    bucket_fill_observed[balls_index1]++;
+    bucket_fill_observed[balls_index2]++;
   }
     
   uns64 index;
@@ -153,11 +210,11 @@ uns insert_ball(uns64 ballID){
 
   //------ LOAD AWARE SKEW SELECTION -----
   //Identify which Bucket (index) has Less Load
-  if(bucket[index2] < bucket[index1]){
+  if(balls_index2 < balls_index1){
     index = index2;
-  } else if (bucket[index1] < bucket[index2]){
+  } else if (balls_index1 < balls_index2){
     index = index1;    
-  } else if (bucket[index2] == bucket[index1]) {
+  } else if (balls_index2 == balls_index1) {
 
 #if BREAK_TIES_PREFERENTIALLY == 0
     //Break ties randomly
@@ -176,17 +233,40 @@ uns insert_ball(uns64 ballID){
   }
 
   //Increments count for Bucket where Ball Inserted 
-  retval = bucket[index];
-  bucket[index]++;
+  if (index >= NUM_BUCKETS_PER_SKEW)
+  {
+    retval = bucket[index] + extra_buckets [index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets [index-NUM_BUCKETS_PER_SKEW].balls_1;
+  }
+  else
+  {
+    retval = bucket[index] + extra_buckets [index].balls_0 + extra_buckets [index].balls_1;
+  }
+  
+  
+  bool print_it = false;
+  //bucket[index]++;
+  if (bucket[index] < BASE_WAYS_PER_SKEW)
+  {
+    bucket[index]++;
+  }
+  else
+  {
+    if (index>=NUM_BUCKETS_PER_SKEW)
+      extra_buckets[index-NUM_BUCKETS_PER_SKEW].balls_1++;
+    else
+      extra_buckets[index].balls_0++;
+  }
 
   //Track which bucket the new Ball was inserted in
   assert(balls[ballID] == (uns64)-1);
   balls[ballID] = index;
   
+  //retval = bucket[index] + extra_buckets [index/2];
   //----------- SPILL --------
   if(SPILL_THRESHOLD && (retval >= SPILL_THRESHOLD)){
     //Overwrite balls[ballID] with spill_index.
     spill_ball(index,ballID);   
+    
   }
 
   // Return num-balls in bucket where new ball inserted.
@@ -204,10 +284,34 @@ uns64 remove_ball(void){
   // Identify which bucket this ball is in 
   assert(balls[ballID] != (uns64)-1);
   uns64 bucket_index = balls[ballID];
-
+  
   // Update Ball Tracking
-  assert(bucket[bucket_index] != 0 );  
-  bucket[bucket_index]--;
+  if (bucket_index>=NUM_BUCKETS_PER_SKEW)
+  {
+    assert((bucket[bucket_index] + extra_buckets[bucket_index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[bucket_index-NUM_BUCKETS_PER_SKEW].balls_1) != 0 );  
+  }
+  else
+  {
+    assert((bucket[bucket_index] + extra_buckets[bucket_index].balls_0 + extra_buckets[bucket_index].balls_1) != 0 );  
+  }
+  
+  bool print_it = false;
+
+  if (bucket_index>=NUM_BUCKETS_PER_SKEW)
+  {
+    if (extra_buckets[bucket_index-NUM_BUCKETS_PER_SKEW].balls_1 > 0)
+      extra_buckets[bucket_index-NUM_BUCKETS_PER_SKEW].balls_1--;
+    else
+      bucket[bucket_index]--;
+  }
+  else
+  {
+    if (extra_buckets[bucket_index].balls_0 > 0)
+      extra_buckets[bucket_index].balls_0--;
+    else
+      bucket[bucket_index]--;
+  }
+  
   balls[ballID] = -1;
 
   // Return BallID removed (ID will be reused for new ball to be inserted)  
@@ -226,7 +330,14 @@ void display_histogram(void){
   }
 
   for(ii=0; ii< NUM_BUCKETS; ii++){
-    s_count[bucket[ii]]++;
+    if (ii>=NUM_BUCKETS_PER_SKEW)
+    {
+      s_count[(bucket[ii] + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_1)]++;
+    }
+    else
+    {
+      s_count[(bucket[ii] + extra_buckets[ii].balls_0 + extra_buckets[ii].balls_1)]++;
+    }
   }
 
   //  printf("\n");
@@ -252,12 +363,33 @@ void sanity_check(void){
   
   for(ii=0; ii< NUM_BUCKETS; ii++){
     count += bucket[ii];
-    s_count[bucket[ii]]++;
+    if (ii>= NUM_BUCKETS_PER_SKEW)
+    {
+      s_count[(bucket[ii] + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_1)]++;
+    }
+    else
+    {
+      s_count[(bucket[ii] + extra_buckets[ii].balls_0 + extra_buckets[ii].balls_1)]++;
+    }
+    
   }
-
+  for(ii=0; ii< NUM_BUCKETS; ii+=2){
+    if (ii>= NUM_BUCKETS_PER_SKEW)
+    {
+      count = count + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_1;
+    }
+    else
+    {
+      count = count + extra_buckets[ii].balls_0 + extra_buckets[ii].balls_1;
+    }
+  }
 
   if(count != (NUM_BUCKETS*BALLS_PER_BUCKET)){
     printf("\n*** Sanity Check Failed, TotalCount: %u*****\n", count);
+  }
+  else
+  {
+    printf("\n*** Sanity Passed *****\n");
   }
 }
 
@@ -272,6 +404,11 @@ void init_buckets(void){
   
   for(ii=0; ii<NUM_BUCKETS; ii++){
     bucket[ii]=0;
+    if (ii<NUM_BUCKETS_PER_SKEW)
+    {
+      extra_buckets[ii].balls_0 = 0;
+      extra_buckets[ii].balls_1 = 0;
+    }
   }
  
 
@@ -296,7 +433,7 @@ void init_buckets(void){
 uns  remove_and_insert(void){
   
   uns res = 0;
-
+  
   uns64 ballID = remove_ball();
   res = insert_ball(ballID);
 
@@ -346,7 +483,7 @@ int main(int argc, char* argv[]){
     for(uns64 hundred_mn_count=0; hundred_mn_count<10; hundred_mn_count++){
       //In multiples of 100 Million Ball Throws.
       for(ii=0; ii<HUNDRED_MILLION_TRIES; ii++){
-        //Insert and Remove Ball
+        //Insert and Remove Ball        
         remove_and_insert();      
       }
       printf(".");fflush(stdout);
