@@ -26,7 +26,7 @@ typedef struct tagEntry
     uns dirty;
 
     //Only for shared tag
-    int skewID;
+    int setID;
 
 
 } tagEntry;
@@ -62,10 +62,6 @@ typedef struct dataStore{
   //Entry
   dataEntry* entries;
 } dataStore;
-
-typedef struct {
-    uint64_t* entries;
-} PrinceHashTable;
 
 typedef struct mirageCache{
   
