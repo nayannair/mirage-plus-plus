@@ -142,12 +142,12 @@ void spill_ball(uns64 index, uns64 ballID){
     if(index < NUM_BUCKETS_PER_SKEW)
     {
       spill_index = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index].balls_0 + extra_buckets[spill_index].balls_1;
+      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1;
     } 
     else
     {
       spill_index = mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1;
+      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index].balls_0 + extra_buckets[spill_index].balls_1;
     }
       
     //If new spill_index bucket where spilled-ball is to be installed has space, then done.
@@ -173,7 +173,14 @@ void spill_ball(uns64 index, uns64 ballID){
         std::cout << "SPILL_THRESHOLD = " << SPILL_THRESHOLD << std::endl;
       }
       */
-      assert(balls_at_spill_index == SPILL_THRESHOLD);
+      if (balls_at_spill_index != SPILL_THRESHOLD)
+      {
+        assert(balls_at_spill_index == SPILL_THRESHOLD);
+        std::cout << "balls_at_spill_index = " << balls_at_spill_index << std::endl;
+        std::cout << "SPILL_THRESHOLD = " << SPILL_THRESHOLD << std::endl;
+        
+      }
+      
       //if bucket of spill_index is also full, then recursive-spill, we call this a cuckoo-spill
       index = spill_index;
       cuckoo_spill_count++;
@@ -361,7 +368,8 @@ void sanity_check(void){
     s_count[ii]=0;
   }
   
-  for(ii=0; ii< NUM_BUCKETS; ii++){
+  for(ii=0; ii< NUM_BUCKETS; ii++)
+  {  
     count += bucket[ii];
     if (ii>= NUM_BUCKETS_PER_SKEW)
     {
@@ -373,16 +381,12 @@ void sanity_check(void){
     }
     
   }
-  for(ii=0; ii< NUM_BUCKETS; ii+=2){
-    if (ii>= NUM_BUCKETS_PER_SKEW)
-    {
-      count = count + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[ii-NUM_BUCKETS_PER_SKEW].balls_1;
-    }
-    else
-    {
-      count = count + extra_buckets[ii].balls_0 + extra_buckets[ii].balls_1;
-    }
+  
+  for(ii=0; ii< NUM_BUCKETS_PER_SKEW; ii++)
+  {
+    count = count + extra_buckets[ii].balls_0 + extra_buckets[ii].balls_1;
   }
+
 
   if(count != (NUM_BUCKETS*BALLS_PER_BUCKET)){
     printf("\n*** Sanity Check Failed, TotalCount: %u*****\n", count);
@@ -420,7 +424,7 @@ void init_buckets(void){
   for(ii=0; ii<=MAX_FILL; ii++){
    stat_counts[ii]=0;
   }
-
+  std::cout << "Init Sanity" << std::endl;
   sanity_check();
   init_buckets_done = true;
 }
@@ -473,6 +477,7 @@ int main(int argc, char* argv[]){
   init_buckets();
 
   //Ensure Total Balls in Buckets is Conserved.
+  std::cout << "Main Sanity" << std::endl;
   sanity_check();
 
   printf("Starting --  (Dot printed every 100M Ball throws) \n");
@@ -489,6 +494,7 @@ int main(int argc, char* argv[]){
       printf(".");fflush(stdout);
     }    
     //Ensure Total Balls in Buckets is Conserved.
+    std::cout << "Main (pt2) Sanity" << std::endl;
     sanity_check();
     //Print count of Balls Thrown.
     printf(" %dBn\n",bn_i+1);fflush(stdout);    
@@ -522,5 +528,3 @@ int main(int argc, char* argv[]){
 
   return 0;
 }
-
-
