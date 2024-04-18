@@ -2,39 +2,51 @@ Cache Configuration: 16 MB, 2 skews, 16 ways (8 ways/skew)
 AVG-BALLS-PER-BUCKET:8, BUCKET-SPILL-THRESHOLD:13 
 Simulation Parameters - BALL_THROWS:10000000000, SEED:0
 
+Init Sanity
 
 *** Sanity Passed *****
+Main Sanity
 
 *** Sanity Passed *****
 Starting --  (Dot printed every 100M Ball throws) 
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  1Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  2Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  3Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  4Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  5Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  6Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  7Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  8Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  9Bn
-..........
+..........Main (pt2) Sanity
+
 *** Sanity Passed *****
  10Bn
 
