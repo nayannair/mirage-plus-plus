@@ -119,118 +119,64 @@ void spill_ball(uns64 index, uns64 ballID){
   //bucket[index]--;
   if (index >= NUM_BUCKETS_PER_SKEW)
   {
-    if (extra_buckets[index - NUM_BUCKETS_PER_SKEW].balls_1 > 0)
-      extra_buckets[index - NUM_BUCKETS_PER_SKEW].balls_1--;
-    else
-      bucket[index]--;
+    assert (extra_buckets[index - NUM_BUCKETS_PER_SKEW].balls_1 > 0);
+    extra_buckets[index - NUM_BUCKETS_PER_SKEW].balls_1--;
   }
   else
   {
-    if (extra_buckets[index].balls_0 > 0)
-      extra_buckets[index].balls_0--;
-    else
-      bucket[index]--;
+    assert (extra_buckets[index].balls_0 > 0);
+    extra_buckets[index].balls_0--;
   }
 
   //CoDi relocation
   uns64 spill_index;
   uns64 balls_at_spill_index;
-  for (int i=0; i<(BASE_WAYS_PER_SKEW + EXTRA_BUCKET_CAPACITY); i++)  
+  while(done!=1)
   {
-    if(index < NUM_BUCKETS_PER_SKEW)
+    for (int i=0; i<(BASE_WAYS_PER_SKEW + EXTRA_BUCKET_CAPACITY); i++)  
     {
-      spill_index = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1;
-    } 
-    else
-    {
-      spill_index = mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index].balls_0 + extra_buckets[spill_index].balls_1;
-    }
-      
-    //If new spill_index bucket where spilled-ball is to be installed has space, then done.
-    if(balls_at_spill_index < SPILL_THRESHOLD)
-    {
-      done=1;
-      break;
-    }
-    else
-    {
-      assert(balls_at_spill_index == SPILL_THRESHOLD);
-    }
-  }  
-
-  if (done == 0)
-  {
-    codi_spill_count++;
-  }
-  else
-  {
-    if (bucket[spill_index] < BASE_WAYS_PER_SKEW)
-      bucket[spill_index]++;
-    else
-    {
-      if (spill_index >= NUM_BUCKETS_PER_SKEW)
-        extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1++;
-      else
-        extra_buckets[spill_index].balls_0++;
-    }
-    balls[ballID] = spill_index;
-    //index = spill_index;
-  }
-
-  /*  
-  while(done!=1){
-    //Pick skew & bucket-index where spilled ball should be placed.
-    uns64 spill_index ;
-    //If current index is in Skew0, then pick Skew1. Else vice-versa.
-    uns64 balls_at_spill_index;
-    if(index < NUM_BUCKETS_PER_SKEW)
-    {
-      spill_index = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1;
-    } 
-    else
-    {
-      spill_index = mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-      balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index].balls_0 + extra_buckets[spill_index].balls_1;
-    }
-      
-    //If new spill_index bucket where spilled-ball is to be installed has space, then done.
-    if(balls_at_spill_index < SPILL_THRESHOLD){
-      done=1;
-      
-      if (bucket[spill_index] < BASE_WAYS_PER_SKEW)
-        bucket[spill_index]++;
+      if(index < NUM_BUCKETS_PER_SKEW)
+      {
+        spill_index = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
+        balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_0 + extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1;
+      } 
       else
       {
-        if (spill_index >= NUM_BUCKETS_PER_SKEW)
-          extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1++;
+        spill_index = mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
+        balls_at_spill_index = bucket[spill_index] + extra_buckets[spill_index].balls_0 + extra_buckets[spill_index].balls_1;
+      }
+        
+      //If new spill_index bucket where spilled-ball is to be installed has space, then done.
+      if(balls_at_spill_index < SPILL_THRESHOLD)
+      {
+        done=1;
+        //insert current ball at index
+        if (bucket[spill_index] < BASE_WAYS_PER_SKEW)
+        {
+          bucket[spill_index]++;
+        }
         else
-          extra_buckets[spill_index].balls_0++;
+        {
+          if (spill_index >= NUM_BUCKETS_PER_SKEW)
+            extra_buckets[spill_index-NUM_BUCKETS_PER_SKEW].balls_1++;
+          else
+            extra_buckets[spill_index].balls_0++;
+        }
+        balls[ballID] = spill_index;
+        break;
       }
-      balls[ballID] = spill_index;
-     
-    } else {
-      
-      if (balls_at_spill_index != SPILL_THRESHOLD)
-      {
-        std::cout << "balls_at_spill_index = " << balls_at_spill_index << std::endl;
-        std::cout << "SPILL_THRESHOLD = " << SPILL_THRESHOLD << std::endl;
-      }
-      
-      if (balls_at_spill_index != SPILL_THRESHOLD)
+      else
       {
         assert(balls_at_spill_index == SPILL_THRESHOLD);
-        std::cout << "balls_at_spill_index = " << balls_at_spill_index << std::endl;
-        std::cout << "SPILL_THRESHOLD = " << SPILL_THRESHOLD << std::endl;
-        
       }
-      
+    }  
+    if (done!=1)
+    {
       index = spill_index;
+      //codi spill count is the number of spills despite 1 level of codi relocation
+      codi_spill_count++;
     }
   }
-  */
   spill_count++;
 }
 
@@ -303,25 +249,31 @@ uns insert_ball(uns64 ballID){
   else
   {
     if (index>=NUM_BUCKETS_PER_SKEW)
+    {
       extra_buckets[index-NUM_BUCKETS_PER_SKEW].balls_1++;
+    }
     else
+    {
       extra_buckets[index].balls_0++;
+    }
   }
 
   //Track which bucket the new Ball was inserted in
   assert(balls[ballID] == (uns64)-1);
   balls[ballID] = index;
-  
+  bool inserted = true;
   //retval = bucket[index] + extra_buckets [index/2];
   //----------- SPILL --------
   if(SPILL_THRESHOLD && (retval >= SPILL_THRESHOLD)){
     //Overwrite balls[ballID] with spill_index.
     spill_ball(index,ballID);   
-    
   }
 
   // Return num-balls in bucket where new ball inserted.
-  return retval;  
+  if (inserted)
+    return retval;  
+  else
+    return -1;
 }
 
 /////////////////////////////////////////////////////
@@ -459,7 +411,6 @@ void init_buckets(void){
     }
   }
  
-
   for(ii=0; ii<(NUM_BUCKETS*BALLS_PER_BUCKET); ii++){
     balls[ii] = -1;
     insert_ball(ii);
@@ -509,7 +460,7 @@ int main(int argc, char* argv[]){
   SPILL_THRESHOLD = BASE_WAYS_PER_SKEW + EXTRA_BUCKET_CAPACITY;
   NUM_BILLION_TRIES  = atoi(argv[2]);
   myseed = atoi(argv[3]);
-
+  myseed = 5;
   printf("Cache Configuration: %d MB, %d skews, %d ways (%d ways/skew)\n",CACHE_SZ_BYTES/1024/1024,NUM_SKEWS,NUM_SKEWS*BASE_WAYS_PER_SKEW,BASE_WAYS_PER_SKEW);
   printf("AVG-BALLS-PER-BUCKET:%d, BUCKET-SPILL-THRESHOLD:%d \n",BASE_WAYS_PER_SKEW,SPILL_THRESHOLD);
   printf("Simulation Parameters - BALL_THROWS:%llu, SEED:%d\n\n",(unsigned long long)NUM_BILLION_TRIES*(unsigned long long)BILLION_TRIES,myseed);
