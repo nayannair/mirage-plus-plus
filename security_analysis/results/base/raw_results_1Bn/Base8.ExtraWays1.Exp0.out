@@ -1,0 +1,81 @@
+Cache Configuration: 16 MB, 2 skews, 16 ways (8 ways/skew)
+AVG-BALLS-PER-BUCKET:8, BUCKET-SPILL-THRESHOLD:9 
+Simulation Parameters - BALL_THROWS:1000000000, SEED:0
+
+
+*** Sanity Passed *****
+
+*** Sanity Passed *****
+Starting --  (Dot printed every 100M Ball throws) 
+..........
+*** Sanity Passed *****
+ 1Bn
+
+
+Bucket-Occupancy Snapshot at End of Experiment
+
+Occupancy: 		 Count
+Bucket[ 0 Fill]: 	 0 	 (0.00)
+Bucket[ 1 Fill]: 	 1 	 (0.00)
+Bucket[ 2 Fill]: 	 1 	 (0.00)
+Bucket[ 3 Fill]: 	 11 	 (0.03)
+Bucket[ 4 Fill]: 	 77 	 (0.23)
+Bucket[ 5 Fill]: 	 300 	 (0.92)
+Bucket[ 6 Fill]: 	 1118 	 (3.41)
+Bucket[ 7 Fill]: 	 3495 	 (10.67)
+Bucket[ 8 Fill]: 	 9137 	 (27.88)
+Bucket[ 9 Fill]: 	 18628 	 (56.85)
+Bucket[10 Fill]: 	 0 	 (0.00)
+Bucket[11 Fill]: 	 0 	 (0.00)
+Bucket[12 Fill]: 	 0 	 (0.00)
+Bucket[13 Fill]: 	 0 	 (0.00)
+Bucket[14 Fill]: 	 0 	 (0.00)
+Bucket[15 Fill]: 	 0 	 (0.00)
+Bucket[16 Fill]: 	 0 	 (0.00)
+
+
+Distribution of Bucket-Occupancy (Averaged across Ball Throws) => Used for P(Bucket = k balls) calculation 
+
+Occupancy: 		            Count 	 P(Bucket=k balls)
+Bucket[ 0 Fill]: 	              346 	 (0.000)
+Bucket[ 1 Fill]: 	             8078 	 (0.000)
+Bucket[ 2 Fill]: 	            91692 	 (0.005)
+Bucket[ 3 Fill]: 	           699028 	 (0.035)
+Bucket[ 4 Fill]: 	          3994330 	 (0.200)
+Bucket[ 5 Fill]: 	         18187464 	 (0.909)
+Bucket[ 6 Fill]: 	         68349640 	 (3.417)
+Bucket[ 7 Fill]: 	        215282638 	 (10.764)
+Bucket[ 8 Fill]: 	        560954505 	 (28.048)
+Bucket[ 9 Fill]: 	       1132432279 	 (56.622)
+Bucket[10 Fill]: 	                0 	 (0.000)
+Bucket[11 Fill]: 	                0 	 (0.000)
+Bucket[12 Fill]: 	                0 	 (0.000)
+Bucket[13 Fill]: 	                0 	 (0.000)
+Bucket[14 Fill]: 	                0 	 (0.000)
+Bucket[15 Fill]: 	                0 	 (0.000)
+Bucket[16 Fill]: 	                0 	 (0.000)
+
+
+Distribution of Balls-in-Dest-Bucket on Ball-Insertion (Best-Of-2 Indexed-Buckets) => Spill-Count = Spills from Bucket-With-9-Balls
+
+Balls-in-Dest-Bucket (k) 		 Spills from Bucket-With-k-Balls)
+ 0:				              346	 (0.000)
+ 1:				             8078	 (0.001)
+ 2:				            91690	 (0.009)
+ 3:				           698887	 (0.070)
+ 4:				          3988763	 (0.399)
+ 5:				         18061000	 (1.806)
+ 6:				         66397695	 (6.640)
+ 7:				        193866186	 (19.387)
+ 8:				        396286820	 (39.629)
+ 9:				        320600535	 (32.060)
+10:				                0	 (0.000)
+11:				                0	 (0.000)
+12:				                0	 (0.000)
+13:				                0	 (0.000)
+14:				                0	 (0.000)
+15:				                0	 (0.000)
+
+Spill Count: 320602603 (32.060)
+
+Cuckoo Spill Count: 418526613 (41.853)
