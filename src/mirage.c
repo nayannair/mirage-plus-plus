@@ -585,6 +585,7 @@ Addr codiVictim(mirageCache* c, uns skew_select, uns set_select, uns* skew_opt)
             break;
         }
     }
+
     return target;
 }
 
@@ -594,6 +595,19 @@ int checkInvalidTags(mirageCache* c, uns skew, Addr reloc_addr)
     for(uint32_t i=0; i < c->TagStore->total_assocs_per_skew; i++)
     {
         if(!(c->TagStore->entries[skew*SKEW_SIZE+reloc_addr*SET_SIZE+i].valid))
+        {
+            //printf("Set=%d, Invalid Tag at %d\n",reloc_addr,i);
+            invalid_tags++;
+        }
+        else
+        {
+            //printf("Valid Entry with Tag=%llu\n",c->TagStore->entries[skew*SKEW_SIZE+reloc_addr*SET_SIZE+i].full_tag);
+        }
+    }
+
+    for(uint32_t i=0; i < c->SharedTagStore->shared_assocs; i++)
+    {
+        if(!(c->SharedTagStore->entries[reloc_addr*SHARED_WAYS+i].valid))
         {
             //printf("Set=%d, Invalid Tag at %d\n",reloc_addr,i);
             invalid_tags++;
