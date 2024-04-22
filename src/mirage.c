@@ -297,7 +297,7 @@ void mirage_install (mirageCache *c, Addr addr)
             }
         }
     }
-    */
+    
 
     int ways_used = 0;
     uns64 set_index = (skew_select*SKEW_SIZE)+(c->skew_set_index_arr[skew_select]*SET_SIZE);
@@ -399,7 +399,7 @@ uns skewSelect(mirageCache *c, Addr addr, Flag* tagSAE)
                 invalid_tags++;
             }
         }
-        */
+        
 
         if(invalid_tags > max_invalid_tags)
         {
@@ -604,10 +604,25 @@ int checkInvalidTags(mirageCache* c, uns skew, Addr reloc_addr)
         {
             //printf("Set=%d, Invalid Tag at %d\n",reloc_addr,i);
             invalid_tags++;
+            break;
         }
         else
         {
             //printf("Valid Entry with Tag=%llu\n",c->TagStore->entries[skew*SKEW_SIZE+reloc_addr*SET_SIZE+i].full_tag);
+        }
+    }
+
+    for (int i =0 ; i < c->SharedTagStore->shared_assocs ; i++)
+    {
+        uns64 llc_index = skew*SHARED_WAYS*(NUM_SETS/2) +reloc_addr*SHARED_WAYS+i;
+        if(!c->SharedTagStore->entries[llc_index].valid)
+        {
+            invalid_tags++;
+            break;
+        }
+        else
+        {
+            
         }
     }
 
