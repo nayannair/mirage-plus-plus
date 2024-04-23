@@ -166,12 +166,13 @@ void spill_ball(uns64 index, uns64 ballID){
         index = spill_index;
         //codi spill count is the number of spills despite 1 level of codi relocation
         codi_spill_count++;
+        spill_count++;
       }    
     
     }
   }
 
-  spill_count++;
+  
 }
 
 /////////////////////////////////////////////////////

@@ -15,19 +15,17 @@ do
     ## Run $NUM_EXP experiments
     for (( i=0; i<$NUM_EXP; i++ ))
     do
-        #stdbuf -oL ../../bin/mirage8WPS_kExtraWays_NBn.o $extra_ways_per_skew $NUM_BILLION_BALLS_PER_EXP $i \
-        #       > raw_results/Base8.ExtraWays${extra_ways_per_skew}.Exp${i}.out &
-        stdbuf -oL ../../latest.o $extra_ways_per_skew 10 $i \
+        stdbuf -oL ../../bin/mirage8WPS_kExtraWays_NBn.o $extra_ways_per_skew $NUM_BILLION_BALLS_PER_EXP $i \
                > raw_results/Base8.ExtraWays${extra_ways_per_skew}.Exp${i}.out &
     done
 done
 
 ## Wait for completion of all experiments.
-exp_count=`ps aux | grep -i "latest.o" | grep -v "grep" | wc -l`
+exp_count=`ps aux | grep -i "mirage8WPS_kExtraWays_NBn.o" | grep -v "grep" | wc -l`
 while [ $exp_count -gt 0 ]
 do
     sleep 30
-    exp_count=`ps aux | grep -i "latest.o" | grep -v "grep" | wc -l`    
+    exp_count=`ps aux | grep -i "mirage8WPS_kExtraWays_NBn.o" | grep -v "grep" | wc -l`    
 done
 
 
