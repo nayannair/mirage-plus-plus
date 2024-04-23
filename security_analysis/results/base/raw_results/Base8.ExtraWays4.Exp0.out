@@ -79,6 +79,6 @@ Balls-in-Dest-Bucket (k) 		 Spills from Bucket-With-k-Balls)
 14:				                0	 (0.000)
 15:				                0	 (0.000)
 
-Spill Count: 60 (0.000)
+Spill Count: 0 (0.000)
 
-Cuckoo Spill Count: 0 (0.000)
+Codi Spill Count: 0 (0.000)
