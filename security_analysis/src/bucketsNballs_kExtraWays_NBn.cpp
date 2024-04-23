@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <iostream>
+#include <cmath>
 
 #include "mtrand.h"
 
@@ -125,11 +126,13 @@ void spill_ball(uns64 index, uns64 ballID){
     assert (extra_buckets[index/2].balls_0 > 0);
     extra_buckets[index/2].balls_0--;
   }
-    
+
+  int codi_level = 0;
+  
   uns64 spill_index ;
   uns64 balls_at_spill_index;  
   while(done!=1){
-    for (int i=0; i<(BASE_WAYS_PER_SKEW + EXTRA_BUCKET_CAPACITY); i++) 
+    for (int i=0; i<pow(BASE_WAYS_PER_SKEW, (codi_level+1)); i++) 
     {
       //If current index is in Skew0, then pick Skew1. Else vice-versa.
       if(index < NUM_BUCKETS_PER_SKEW)
@@ -143,7 +146,9 @@ void spill_ball(uns64 index, uns64 ballID){
       if(balls_at_spill_index < SPILL_THRESHOLD)
       {
         done=1;
-        
+        //1 level of codi was not sufficient
+        if (codi_level > 0)
+          spill_count++;
         if (bucket[spill_index] < BASE_WAYS_PER_SKEW)
           bucket[spill_index]++;
         else
@@ -159,17 +164,15 @@ void spill_ball(uns64 index, uns64 ballID){
       else 
       {
         assert(balls_at_spill_index == SPILL_THRESHOLD);
-      }
-      
-      if (done!=1)
-      {
-        index = spill_index;
-        //codi spill count is the number of spills despite 1 level of codi relocation
-        codi_spill_count++;
-        spill_count++;
-      }    
-    
+      } 
     }
+    if (done!=1)
+    {
+      index = spill_index;
+      codi_level += 1;
+      //codi spill count is the number of spills despite 1 level of codi relocation
+      codi_spill_count++;
+    }   
   }
 
   
