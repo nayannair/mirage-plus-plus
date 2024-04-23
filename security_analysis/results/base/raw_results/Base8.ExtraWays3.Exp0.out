@@ -115,6 +115,6 @@ Balls-in-Dest-Bucket (k) 		 Spills from Bucket-With-k-Balls)
 14:				                0	 (0.000)
 15:				                0	 (0.000)
 
-Spill Count: 44235045 (0.442)
+Spill Count: 0 (0.000)
 
 CoDi Spill Count: 0 (0.000)
