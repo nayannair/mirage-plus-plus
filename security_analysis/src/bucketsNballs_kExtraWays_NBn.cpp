@@ -67,7 +67,6 @@ typedef double dbl;
 //For each Bucket (Set), number of Balls in Bucket
 //(Data-Structure Similar to Tag-Store)
 uns64 bucket[NUM_BUCKETS];
-uns64 bucket[NUM_BUCKETS/2];
 
 //For each Ball (Cache-Line), which Bucket (Set) it is in
 //(Data-Structure Similar to Data-Store RPTR)
@@ -81,7 +80,7 @@ uns64 stat_counts[MAX_FILL+1];
 //Number of Spills from Buckets
 uns64 spill_count = 0;
 //Number of Spills despite relocation attempts.
-uns64 cuckoo_spill_count = 0;
+uns64 codi_spill_count = 0;
 
 //Tracks if Initialization of Buckets Done
 bool init_buckets_done = false;
@@ -96,39 +95,59 @@ MTRand *mtrand=new MTRand();
 /////////////////////////////////////////////////////
 // Spill Ball: relocating filled bucket
 // -- Based on which skew spill happened;
-// -- cuckoo into other recursively.
+// -- codi into other recursively.
 /////////////////////////////////////////////////////
 
 void spill_ball(uns64 index, uns64 ballID){
   uns done=0;
 
+  assert (bucket[index] == (BASE_WAYS_PER_SKEW+EXTRA_BUCKET_CAPACITY+1));
   bucket[index]--;
 
-  while(done!=1){
+  int codi_level = 0;
+  uns64 spill_index;
+  uns64 balls_at_spill_index;
+  
+  while(done!=1)
+  {
     //Pick skew & bucket-index where spilled ball should be placed.
-    uns64 spill_index ;
     //If current index is in Skew0, then pick Skew1. Else vice-versa.
-    if(index < NUM_BUCKETS_PER_SKEW)
-      spill_index = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
-    else
-      spill_index = mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
+    for (int i=0; i<pow(BASE_WAYS_PER_SKEW, (codi_level+1)); i++)
+    {
+      if(index < NUM_BUCKETS_PER_SKEW)
+        spill_index = NUM_BUCKETS_PER_SKEW + mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
+      else
+        spill_index = mtrand->randInt(NUM_BUCKETS_PER_SKEW-1);
 
-    //If new spill_index bucket where spilled-ball is to be installed has space, then done.
-    if(bucket[spill_index] < SPILL_THRESHOLD){
-      done=1;
-      bucket[spill_index]++;
-      balls[ballID] = spill_index;
-     
-    } else {
-      assert(bucket[spill_index] == SPILL_THRESHOLD);
-      //if bucket of spill_index is also full, then recursive-spill, we call this a cuckoo-spill
-      index = spill_index;
-      cuckoo_spill_count++;
+      balls_at_spill_index = bucket[spill_index];
+
+      if(balls_at_spill_index < SPILL_THRESHOLD)
+      {
+        done=1;
+        if (codi_level > 0)
+          spill_count++;
+
+        bucket[spill_index]++;
+        balls[ballID] = spill_index;
+
+        break;
+      } 
+      else 
+      {
+        assert(bucket[spill_index] == SPILL_THRESHOLD);
+      }
     }
+    
+    if (done!=1)
+    {
+      index = spill_index;
+      codi_level += 1;
+      //codi spill count is the number of spills despite 1 level of codi relocation
+      codi_spill_count++;
+    }    
   }
-
-  spill_count++;
 }
+
 
 /////////////////////////////////////////////////////
 // Insert Ball in Bucket
@@ -380,8 +399,8 @@ int main(int argc, char* argv[]){
 
   printf("\nSpill Count: %llu (%5.3f)\n", spill_count,
          100.0* (double)spill_count/(double)((double)NUM_BILLION_TRIES*(double)BILLION_TRIES));
-  printf("\nCuckoo Spill Count: %llu (%5.3f)\n", cuckoo_spill_count,
-         100.0* (double)cuckoo_spill_count/(double)((double)NUM_BILLION_TRIES*(double)BILLION_TRIES));
+  printf("\nCodi Spill Count: %llu (%5.3f)\n", codi_spill_count,
+         100.0* (double)codi_spill_count/(double)((double)NUM_BILLION_TRIES*(double)BILLION_TRIES));
 
   return 0;
 }
