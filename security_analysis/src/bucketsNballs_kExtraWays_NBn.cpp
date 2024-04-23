@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <iostream>
+#include <cmath>
 
 #include "mtrand.h"
 
@@ -128,12 +129,14 @@ void spill_ball(uns64 index, uns64 ballID){
     extra_buckets[index].balls_0--;
   }
 
+  int codi_level = 0;
+
   //CoDi relocation
   uns64 spill_index;
   uns64 balls_at_spill_index;
   while(done!=1)
   {
-    for (int i=0; i<(BASE_WAYS_PER_SKEW + EXTRA_BUCKET_CAPACITY); i++)  
+    for (int i=0; i<pow(BASE_WAYS_PER_SKEW, (codi_level+1)); i++)
     {
       if(index < NUM_BUCKETS_PER_SKEW)
       {
@@ -150,7 +153,8 @@ void spill_ball(uns64 index, uns64 ballID){
       if(balls_at_spill_index < SPILL_THRESHOLD)
       {
         done=1;
-        
+        if (codi_level > 0)
+          spill_count++;
         //insert current ball at index
         if (bucket[spill_index] < BASE_WAYS_PER_SKEW)
         {
@@ -174,9 +178,9 @@ void spill_ball(uns64 index, uns64 ballID){
     if (done!=1)
     {
       index = spill_index;
+      codi_level += 1;
       //codi spill count is the number of spills despite 1 level of codi relocation
       codi_spill_count++;
-      spill_count++;
     }
   }
   
